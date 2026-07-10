@@ -24,7 +24,7 @@ Capafy เป็น marketplace สำหรับ "Skill-based Agent" — ผ�
 
 ## Publisher Workflow (ฝั่งคนขาย Skill)
 
-ใช้ Skill ชื่อ capafy-publisher ติดตั้งเข้า agent client แล้วทำงานผ่าน 4 คำสั่ง + 3 จุด checkpoint บนเว็บ:
+ใช้ Skill ชื่อ `capafy-publisher ติดตั้งเข้า agent client แล้วทำงานผ่าน 4 คำสั่ง + 3 จุด checkpoint บนเว็บ:
 
 1. **Log in** — ผูก token ไว้กับเครื่อง
 2. **`publish-init`** — สแกน workspace หา Skill ที่ publish ได้ (โฟลเดอร์ที่มี `SKILL.md` + scripts + config) → **Web Checkpoint 1**: ยืนยันไฟล์ + เลือกโหมดขาย (Run Online / Download)
