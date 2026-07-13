@@ -1,48 +1,61 @@
+"""
+Protected Skill Service
+========================
+หัวใจของ POC: พิสูจน์ว่า Secret Logic (prompt/เกณฑ์การประเมินภายในองค์กร)
+สามารถอยู่เบื้องหลัง service นี้ได้ โดยที่ input/output ที่ผ่าน API ไม่มี
+วันมี prompt ลับหลุดออกไป
+
+Skill นี้คือ "Internal Document Review Skill" — รับ "เอกสาร" แล้วประเมิน
+ตามเกณฑ์ภายในองค์กร
+"""
+
 import os
 
-from anthropic import Anthropic
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from prompt import SECRET_SYSTEM_PROMPT
+# TODO:
+# Re-enable when switching from mock to Claude.
+# from prompt import SECRET_SYSTEM_PROMPT
 
 load_dotenv()
 
 SKILL_PORT = int(os.getenv("SKILL_PORT", "8001"))
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
-MODEL_NAME = "claude-sonnet-4-6"
-MAX_TOKENS = 500
 
-app = FastAPI(title="Protected Skill Service")
-client = Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
+# TODO:
+# Replace mock implementation with Anthropic client
+# after architecture validation.
+
+app = FastAPI(title="Protected Skill Service - Internal Document Review")
+
 
 class ExecuteRequest(BaseModel):
-    resume: str
+    document: str
+
 
 class ExecuteResponse(BaseModel):
     result: str
 
-def run_skill(resume: str) -> str:
-    """
-    Business logic: รับ resume text -> เรียก Claude ด้วย secret prompt
-    -> คืนแค่ข้อความผลลัพธ์ (ไม่ผูกกับ FastAPI/HTTP เลย ทำให้ unit test ตรงๆ
-    ได้โดยไม่ต้องยิง request ผ่าน endpoint)
-    """
-    if client is None:
-        raise RuntimeError("ANTHROPIC_API_KEY ยังไม่ได้ตั้งค่า")
 
-    try:
-        message = client.messages.create(
-            model=MODEL_NAME,
-            max_tokens=MAX_TOKENS,
-            system=SECRET_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": resume}],
-        )
-    except Exception as exc:
-        raise RuntimeError(f"เรียก Claude ไม่สำเร็จ: {exc}") from exc
+def run_skill(document: str) -> str:
+    """
+    Mock implementation for POC.
 
-    return "".join(block.text for block in message.content if block.type == "text")
+    In the production system this function will call
+    Claude (or another execution engine).
+    """
+
+    return (
+        "Overall Assessment: Suitable\n\n"
+        "Reasons:\n"
+        "- Relevant to the requested task\n"
+        "- Well-structured\n"
+        "- Sufficient information provided\n\n"
+        "Suggestions:\n"
+        "- Improve formatting\n"
+        "- Add more project details"
+    )
 
 
 @app.get("/health")
@@ -56,11 +69,11 @@ def execute(payload: ExecuteRequest):
     Endpoint บางๆ: validate เบื้องต้น -> เรียก run_skill -> ห่อเป็น response
     ไม่มี logic ของ Claude/prompt ปนอยู่ในนี้เลย
     """
-    if not payload.resume.strip():
-        raise HTTPException(status_code=400, detail="resume ต้องไม่ว่างเปล่า")
+    if not payload.document.strip():
+        raise HTTPException(status_code=400, detail="document ต้องไม่ว่างเปล่า")
 
     try:
-        result = run_skill(payload.resume)
+        result = run_skill(payload.document)
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
