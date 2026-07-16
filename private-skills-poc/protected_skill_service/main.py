@@ -23,23 +23,60 @@ Output: {"result": "..."}
 
 import os
 import traceback
-
+ 
 from anthropic import Anthropic
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-
+ 
 from prompt import SECRET_SYSTEM_PROMPT
-
+ 
 load_dotenv()
-
+ 
 SKILL_PORT = int(os.getenv("SKILL_PORT", "8001"))
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api"
 MODEL_NAME = "anthropic/claude-sonnet-4"
-MAX_TOKENS = 1024
-
-app = FastAPI(title="Protected Skill Service - Internal Document Review")
+MAX_TOKENS = 1500
+ 
+# ชื่อ tool ที่บังคับให้ Claude ต้องเรียกเพื่อตอบกลับ — การบังคับผ่าน
+# tool_choice ทำให้ response เป็น JSON ตาม schema นี้เสมอ ไม่มีทางหลุดเป็น free-text
+SUBMIT_INSTRUCTIONS_TOOL = {
+    "name": "submit_edit_instructions",
+    "description": (
+        "ส่งรายการคำสั่งแก้ไขเอกสาร แต่ละคำสั่งระบุ exact substring ที่จะ "
+        "หา (old_str) และข้อความที่จะแทนที่ (new_str)"
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "instructions": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "old_str": {
+                            "type": "string",
+                            "description": "exact substring เดิมในเอกสาร ต้อง unique",
+                        },
+                        "new_str": {
+                            "type": "string",
+                            "description": "ข้อความที่จะแทนที่ old_str",
+                        },
+                        "reason": {
+                            "type": "string",
+                            "description": "คำอธิบายสั้นๆ ว่าทำไมถึงแก้ตรงนี้ (โชว์ให้ user เห็น)",
+                        },
+                    },
+                    "required": ["old_str", "new_str", "reason"],
+                },
+            },
+        },
+        "required": ["instructions"],
+    },
+}
+ 
+app = FastAPI(title="Protected Skill Service - Instruction-based Editing")
 client = (
     Anthropic(
         auth_token=OPENROUTER_API_KEY,
@@ -48,45 +85,69 @@ client = (
     if OPENROUTER_API_KEY
     else None
 )
-
-
+ 
+ 
 class ExecuteRequest(BaseModel):
     document: str
-
-
+ 
+ 
+class Instruction(BaseModel):
+    old_str: str
+    new_str: str
+    reason: str
+ 
+ 
 class ExecuteResponse(BaseModel):
-    result: str
-
-
-def run_skill(document: str) -> str:
+    instructions: list[Instruction]
+ 
+ 
+def extract_instructions(message) -> list[dict]:
+    """
+    ดึง instructions ออกจาก tool_use block ของ Claude response
+ 
+    แยกออกมาเป็นฟังก์ชันเดี่ยวๆ ไม่ผูกกับ client.messages.create() เลย
+    เพื่อให้ unit test ได้ตรงๆ โดยจำลอง message.content เป็น object ปลอม
+    โดยไม่ต้องเรียก API จริง
+    """
+    for block in message.content:
+        if block.type == "tool_use" and block.name == "submit_edit_instructions":
+            return block.input.get("instructions", [])
+    raise RuntimeError("Claude ไม่ได้เรียก submit_edit_instructions tool กลับมา")
+ 
+ 
+def run_skill(document: str) -> list[dict]:
     """
     Business logic ล้วนๆ: รับเอกสาร -> เรียก Claude (ผ่าน OpenRouter) ด้วย
-    secret prompt -> คืนแค่ข้อความผลลัพธ์
+    secret prompt พร้อมบังคับ tool_use -> คืน list ของ edit instructions
+    (ไม่ผูกกับ FastAPI/HTTP เลย ทำให้ unit test ตรงๆ ได้โดยไม่ต้องยิง
+    request ผ่าน endpoint)
     """
     if client is None:
-        raise RuntimeError("OPENROUTER_API_KEY")
-
+        raise RuntimeError("OPENROUTER_API_KEY ยังไม่ได้ตั้งค่า (ดู .env.example)")
+ 
     try:
         message = client.messages.create(
             model=MODEL_NAME,
             max_tokens=MAX_TOKENS,
             system=SECRET_SYSTEM_PROMPT,
             messages=[{"role": "user", "content": document}],
+            tools=[SUBMIT_INSTRUCTIONS_TOOL],
+            tool_choice={"type": "tool", "name": "submit_edit_instructions"},
         )
-    except Exception as exc:  # เช่น API ล่ม, rate limit, network error
-        # DEBUG: พิมพ์ full traceback ออกที่ terminal ฝั่ง server เท่านั้น
-        # เพื่อดู exception type จริง
+    except Exception as exc:  
+        # เช่น API ล่ม, rate limit, network error
+        # DEBUG: พิมพ์ full traceback ออกที่ terminal ฝั่ง server เท่านั้น เพื่อดู exception type จริง
         traceback.print_exc()
         raise RuntimeError(f"เรียก Claude ไม่สำเร็จ: {exc}") from exc
-
-    return "".join(block.text for block in message.content if block.type == "text")
-
-
+ 
+    return extract_instructions(message)
+ 
+ 
 @app.get("/health")
 def health():
     return {"status": "ok"}
-
-
+ 
+ 
 @app.post("/execute", response_model=ExecuteResponse)
 def execute(payload: ExecuteRequest):
     """
@@ -94,16 +155,16 @@ def execute(payload: ExecuteRequest):
     """
     if not payload.document.strip():
         raise HTTPException(status_code=400, detail="document ต้องไม่ว่างเปล่า")
-
+ 
     try:
-        result = run_skill(payload.document)
+        instructions = run_skill(payload.document)
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
-
-    return ExecuteResponse(result=result)
-
-
+ 
+    return ExecuteResponse(instructions=instructions)
+ 
+ 
 if __name__ == "__main__":
     import uvicorn
-
+ 
     uvicorn.run(app, host="0.0.0.0", port=SKILL_PORT)
