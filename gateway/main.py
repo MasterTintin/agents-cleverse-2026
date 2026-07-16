@@ -3,13 +3,19 @@ Skill Gateway
 =============
 ตัวกลางระหว่าง Frontend กับ Protected Skill Service
 
-หน้าที่ : รับ request จาก user, forward เฉพาะ input ที่จำเป็นไปยัง
-Protected Skill Service, แล้วส่ง result กลับ - 
-Gateway ไม่มีการเก็บ ประมวลผล หรือเข้าถึง Business Logic ภายในของ Skill โดยตรง
+หน้าที่: รับ request จาก user, forward เฉพาะ input ที่จำเป็นไปยัง
+Protected Skill Service, แล้วส่ง instructions กลับ — Gateway ไม่มีวันเห็น
+หรือเก็บ prompt/business logic ลับไว้เลย (ของแบบนั้นอยู่ใน
+protected_skill_service/prompt.py เท่านั้น)
+
+Phase 1 (ดู docs/research/12-file-edit-approach.md) เปลี่ยน response ของ
+Protected Skill จาก {"result": str} เป็น
+{"instructions": [{old_str, new_str, reason}]} — Gateway แค่ relay shape
+ใหม่นี้ต่อไปเฉยๆ ไม่ได้ตีความหรือแตะเนื้อหาข้างใน
 
 สำหรับ POC นี้ (Out of Scope: Registry) Gateway hardcode ไว้เลยว่า
-ทุก request ที่เข้ามาคือ Protected Skill เดียว
-ไม่มี logic ตรวจจับ/เลือก skill หลายตัว
+ทุก request ที่เข้ามาคือ Protected Skill เดียว ไม่มี logic ตรวจจับ/
+เลือก skill หลายตัว
 """
 
 import os
@@ -28,7 +34,7 @@ REQUEST_TIMEOUT_SECONDS = 30
 
 app = FastAPI(title="Skill Gateway")
 
-# เปิด CORS แบบกว้างสำหรับ POC เท่านั้น (frontend/chat.html เป็น static file ที่เปิดจากเครื่อง local)
+# เปิด CORS แบบกว้างสำหรับ POC เท่านั้น — ของจริงต้องจำกัด origin ให้แคบกว่านี้
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -41,8 +47,14 @@ class ChatRequest(BaseModel):
     message: str
 
 
+class Instruction(BaseModel):
+    old_str: str
+    new_str: str
+    reason: str
+
+
 class ChatResponse(BaseModel):
-    result: str
+    instructions: list[Instruction]
 
 
 def is_protected_skill_request(message: str) -> bool:
@@ -52,24 +64,28 @@ def is_protected_skill_request(message: str) -> bool:
     POC นี้มี Skill เดียวและ hardcode ไว้ว่า route ทุกครั้ง (ตาม
     Out of Scope: ไม่มี Registry/หลาย Skill) — ฟังก์ชันนี้แยกออกมา
     ต่างหากเพื่อให้เห็นชัดว่า "จุดตัดสินใจ" อยู่ตรงไหน เผื่อขยายเป็น
-    intent detection จริงในอนาคต
+    intent detection จริงในอนาคต (ดู Architecture Hypothesis ใน
+    docs/research/07-capafy-competitor-analysis.md)
     """
     return bool(message.strip())
 
 
-def call_protected_skill(message: str) -> str:
+def call_protected_skill(message: str) -> list[dict]:
     """
-    ยิง request ไปยัง Protected Skill Service แล้วคืนแค่ผลลัพธ์
+    ยิง request ไปยัง Protected Skill Service แล้วคืนแค่ instructions
 
     รับ parameter ชื่อ `message` เพราะในมุมของ Gateway มันคือแค่ข้อความ
     ดิบจาก user เท่านั้น — Gateway ไม่มีหน้าที่ตีความว่าข้อความนี้คือ
     resume, invoice หรือ document ประเภทไหน การตีความความหมายเป็นหน้าที่
-    ของ Protected Skill Service 
-    Gateway ส่งแค่ field ที่ Protected Skill Service คาดหวัง (document)
+    ของ Protected Skill Service
+    Gateway ส่งแค่ field ที่ Protected Skill Service คาดหวัง
     เท่านั้น ไม่มีการแนบข้อมูลอื่นที่ไม่เกี่ยวข้อง และไม่มีทางเห็น
-    system prompt ที่ใช้ประมวลผลอยู่เบื้องหลัง
+    system prompt ที่ใช้ประมวลผลอยู่เบื้องหลังเลย — Gateway เห็นแค่
+    old_str/new_str/reason ที่ Protected Skill ตัดสินใจส่งกลับมาแล้ว
+    ไม่เห็นว่า Claude คิดยังไงถึงได้คำตอบนี้
     """
     try:
+        # Gateway forwards only user input.
         # Secret prompt remains inside Protected Skill Service.
         response = httpx.post(
             f"{SKILL_SERVICE_URL}/execute",
@@ -84,7 +100,7 @@ def call_protected_skill(message: str) -> str:
     except httpx.RequestError as exc:
         raise RuntimeError(f"เชื่อมต่อ Protected Skill Service ไม่ได้: {exc}") from exc
 
-    return response.json().get("result", "")
+    return response.json()["instructions"]
 
 
 @app.get("/health")
@@ -95,8 +111,8 @@ def health():
 @app.post("/chat", response_model=ChatResponse)
 def chat(payload: ChatRequest):
     """
-    Endpoint ที่ frontend เรียกใช้ — ทำหน้าที่แค่ route + forward
-    ไม่มี business logic ของ skill
+    Endpoint ที่ frontend เรียก — ทำหน้าที่แค่ route + forward เท่านั้น
+    ไม่มี business logic ของ skill อยู่ในนี้
     """
     if not payload.message.strip():
         raise HTTPException(status_code=400, detail="message ต้องไม่ว่างเปล่า")
@@ -107,11 +123,11 @@ def chat(payload: ChatRequest):
         )
 
     try:
-        result = call_protected_skill(payload.message)
+        instructions = call_protected_skill(payload.message)
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    return ChatResponse(result=result)
+    return ChatResponse(instructions=instructions)
 
 
 if __name__ == "__main__":

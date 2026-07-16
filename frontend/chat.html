@@ -14,6 +14,9 @@
         --user-bubble: #6366f1;
         --skill-bubble: #1e293b;
         --error: #f87171;
+        --approve: #4ade80;
+        --old: #fca5a5;
+        --new: #86efac;
       }
       * {
         box-sizing: border-box;
@@ -36,8 +39,14 @@
         font-size: 16px;
         font-weight: 600;
       }
-      header p {
-        margin: 4px 0 0;
+      header .subtitle {
+        margin: 2px 0 0;
+        font-size: 12px;
+        color: var(--accent);
+        font-weight: 500;
+      }
+      header p.status-line {
+        margin: 6px 0 0;
         font-size: 12px;
         color: var(--muted);
       }
@@ -92,10 +101,115 @@
         color: var(--muted);
         font-style: italic;
       }
-      .meta {
+
+      /* --- Instruction cards --- */
+      .instruction-list {
+        align-self: flex-start;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        max-width: 85%;
+        width: 100%;
+      }
+      .instruction-empty {
+        align-self: flex-start;
+        color: var(--muted);
+        font-size: 13px;
+        font-style: italic;
+        background: var(--skill-bubble);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 10px 14px;
+      }
+      .card {
+        background: var(--skill-bubble);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 12px 14px;
+        font-size: 13px;
+      }
+      .card.approved {
+        border-color: var(--approve);
+      }
+      .card-reason {
+        font-size: 12px;
+        color: var(--muted);
+        margin-bottom: 8px;
+      }
+      .card-reason::before {
+        content: "✓ ";
+      }
+      .card-divider {
+        border-top: 1px dashed var(--border);
+        margin: 8px 0;
+      }
+      .card-label {
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: var(--muted);
+        margin-bottom: 3px;
+      }
+      .card-old {
+        background: rgba(248, 113, 113, 0.12);
+        color: var(--old);
+        text-decoration: line-through;
+        padding: 6px 8px;
+        border-radius: 6px;
+        margin-bottom: 6px;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .card-arrow {
+        text-align: center;
+        color: var(--muted);
+        font-size: 12px;
+        margin: 2px 0;
+      }
+      .card-new {
+        background: rgba(134, 239, 172, 0.12);
+        color: var(--new);
+        padding: 6px 8px;
+        border-radius: 6px;
+        margin-bottom: 10px;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .card-actions {
+        display: flex;
+        gap: 8px;
+      }
+      .card-actions button {
+        flex: 1;
+        padding: 6px 0;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--text);
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .btn-approve:hover {
+        border-color: var(--approve);
+        color: var(--approve);
+      }
+      .btn-reject:hover {
+        border-color: var(--error);
+        color: var(--error);
+      }
+      .card.approved .btn-approve {
+        background: var(--approve);
+        color: #052e12;
+        border-color: var(--approve);
+        font-weight: 600;
+      }
+      .card-status {
         font-size: 11px;
         color: var(--muted);
-        margin-top: 4px;
+        margin-top: 6px;
+      }
+      .card-status.warn {
+        color: #fbbf24;
       }
 
       /* --- แนบไฟล์ --- */
@@ -129,7 +243,7 @@
 
       form {
         display: flex;
-        align-items: center;
+        align-items: flex-end;
         gap: 8px;
         padding: 16px 20px;
         border-top: 1px solid var(--border);
@@ -148,7 +262,7 @@
       #attach-btn:hover {
         border-color: var(--accent);
       }
-      input[type="text"] {
+      textarea#document-textarea {
         flex: 1;
         padding: 10px 14px;
         border-radius: 8px;
@@ -156,8 +270,13 @@
         background: var(--panel);
         color: var(--text);
         font-size: 14px;
+        font-family: inherit;
+        resize: vertical;
+        min-height: 44px;
+        max-height: 220px;
+        line-height: 1.5;
       }
-      input[type="text"]:focus {
+      textarea#document-textarea:focus {
         outline: 1px solid var(--accent);
       }
       button[type="submit"] {
@@ -168,6 +287,7 @@
         color: white;
         font-size: 14px;
         cursor: pointer;
+        flex-shrink: 0;
       }
       button:disabled {
         opacity: 0.5;
@@ -178,7 +298,8 @@
   <body>
     <header>
       <h1>Private Skills POC</h1>
-      <p>
+      <p class="subtitle">Instruction-based Editing Prototype</p>
+      <p class="status-line">
         <span id="status-dot"></span
         ><span id="status-text">กำลังเช็ค Gateway...</span>
       </p>
@@ -200,12 +321,11 @@
         accept=".txt,.md,.csv,.json,.log"
         hidden
       />
-      <input
-        id="chat-input"
-        type="text"
-        placeholder="เช่น ช่วยประเมินเอกสารนี้..."
-        autocomplete="off"
-      />
+      <textarea
+        id="document-textarea"
+        rows="2"
+        placeholder="วางเอกสารที่ต้องการแก้ตรงนี้ หรือแนบไฟล์แล้วกดส่ง..."
+      ></textarea>
       <button id="send-btn" type="submit">ส่ง</button>
     </form>
 
@@ -213,12 +333,11 @@
       // Gateway เป็นจุดเดียวที่ frontend รู้จัก — ไม่มีการเรียก Protected Skill Service ตรงๆ จาก frontend
       const GATEWAY_URL = "http://127.0.0.1:8000";
 
-      // จำกัดขนาดไฟล์ที่อ่านได้
-      const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024; // 2MB
+      const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024;
 
       const messagesEl = document.getElementById("messages");
       const formEl = document.getElementById("chat-form");
-      const inputEl = document.getElementById("chat-input");
+      const docTextarea = document.getElementById("document-textarea");
       const sendBtn = document.getElementById("send-btn");
       const statusDot = document.getElementById("status-dot");
       const statusText = document.getElementById("status-text");
@@ -229,7 +348,6 @@
       const attachmentName = document.getElementById("attachment-name");
       const attachmentRemove = document.getElementById("attachment-remove");
 
-      // เก็บไฟล์ที่แนบไว้ปัจจุบัน (รองรับทีละ 1 ไฟล์สำหรับ POC)
       let attachedFile = null;
 
       function addBubble(text, role) {
@@ -253,11 +371,11 @@
         } catch {
           statusDot.className = "down";
           statusText.textContent =
-            "เชื่อมต่อ Gateway ไม่ได้ (เช็คว่ารัน uvicorn ที่ port 8000 อยู่หรือยัง)";
+            "เชื่อมต่อ Gateway ไม่ได้ (เช็คว่ารัน uvicorn ที่ port 8000 หรือไม่)";
         }
       }
 
-      // --- แนบไฟล์ ---
+      // --- แนบไฟล์ (ไม่แก้ logic เดิม) ---
 
       attachBtn.addEventListener("click", () => fileInput.click());
 
@@ -294,11 +412,8 @@
         attachmentBar.classList.remove("show");
       });
 
-      // --- ส่งข้อความ ---
-
       function buildOutgoingMessage(typedText) {
         if (!attachedFile) return typedText;
-
         const header = `[แนบไฟล์: ${attachedFile.name}]`;
         if (typedText) {
           return `${typedText}\n\n${header}\n${attachedFile.content}`;
@@ -306,12 +421,127 @@
         return `${header}\n${attachedFile.content}`;
       }
 
+      // ตัดสินใจว่า "เอกสาร" ที่จะใช้ apply instruction คืออะไร:
+      // มีไฟล์แนบ -> ไฟล์คือเอกสาร (textarea ถือเป็นคำสั่งเสริม)
+      // ไม่มีไฟล์แนบ -> ข้อความใน textarea เองคือเอกสาร
+      function resolveCurrentDocument(typedText) {
+        return attachedFile ? attachedFile.content : typedText;
+      }
+
+      // --- Instruction Cards ---
+
+      function applyInstruction(instruction, card, statusEl, approveBtn) {
+        if (!docTextarea.value.includes(instruction.old_str)) {
+          statusEl.textContent =
+            "⚠️ ไม่พบข้อความนี้ในเอกสาร (อาจถูกแก้ไปแล้ว หรือไม่ตรงกับเอกสารปัจจุบัน)";
+          statusEl.classList.add("warn");
+          return;
+        }
+        docTextarea.value = docTextarea.value.replace(
+          instruction.old_str,
+          instruction.new_str
+        );
+        card.classList.add("approved");
+        approveBtn.disabled = true;
+        statusEl.textContent = "✅ Applied — Document Updated";
+        statusEl.classList.remove("warn");
+      }
+
+      function renderInstructionCard(instruction) {
+        const card = document.createElement("div");
+        card.className = "card";
+
+        const reasonEl = document.createElement("div");
+        reasonEl.className = "card-reason";
+        reasonEl.textContent = instruction.reason;
+
+        const dividerEl = document.createElement("div");
+        dividerEl.className = "card-divider";
+
+        const oldLabel = document.createElement("div");
+        oldLabel.className = "card-label";
+        oldLabel.textContent = "Old";
+        const oldEl = document.createElement("div");
+        oldEl.className = "card-old";
+        oldEl.textContent = instruction.old_str;
+
+        const arrowEl = document.createElement("div");
+        arrowEl.className = "card-arrow";
+        arrowEl.textContent = "↓";
+
+        const newLabel = document.createElement("div");
+        newLabel.className = "card-label";
+        newLabel.textContent = "New";
+        const newEl = document.createElement("div");
+        newEl.className = "card-new";
+        newEl.textContent = instruction.new_str;
+
+        const actionsEl = document.createElement("div");
+        actionsEl.className = "card-actions";
+
+        const approveBtn = document.createElement("button");
+        approveBtn.type = "button";
+        approveBtn.className = "btn-approve";
+        approveBtn.textContent = "Approve";
+
+        const rejectBtn = document.createElement("button");
+        rejectBtn.type = "button";
+        rejectBtn.className = "btn-reject";
+        rejectBtn.textContent = "Reject";
+
+        const statusEl = document.createElement("div");
+        statusEl.className = "card-status";
+
+        approveBtn.addEventListener("click", () => {
+          applyInstruction(instruction, card, statusEl, approveBtn);
+        });
+
+        // Reject = ลบ card ออกจากหน้าจอเลย ตามที่ตกลง
+        rejectBtn.addEventListener("click", () => card.remove());
+
+        actionsEl.appendChild(approveBtn);
+        actionsEl.appendChild(rejectBtn);
+
+        card.appendChild(reasonEl);
+        card.appendChild(dividerEl);
+        card.appendChild(oldLabel);
+        card.appendChild(oldEl);
+        card.appendChild(arrowEl);
+        card.appendChild(newLabel);
+        card.appendChild(newEl);
+        card.appendChild(actionsEl);
+        card.appendChild(statusEl);
+
+        return card;
+      }
+
+      function renderInstructions(instructions) {
+        if (instructions.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "instruction-empty";
+          empty.textContent = "ไม่พบจุดที่ต้องแก้ไข";
+          messagesEl.appendChild(empty);
+          messagesEl.scrollTop = messagesEl.scrollHeight;
+          return;
+        }
+
+        const list = document.createElement("div");
+        list.className = "instruction-list";
+        instructions.forEach((instruction) => {
+          list.appendChild(renderInstructionCard(instruction));
+        });
+        messagesEl.appendChild(list);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      // --- ส่งข้อความ ---
+
       async function sendMessage(displayText, outgoingMessage) {
         addBubble(displayText, "user");
-        const loadingBubble = addBubble("กำลังประมวลผล...", "skill loading");
+        const loadingBubble = addBubble("กำลังวิเคราะห์...", "skill loading");
 
         sendBtn.disabled = true;
-        inputEl.disabled = true;
+        docTextarea.disabled = true;
 
         try {
           const res = await fetch(`${GATEWAY_URL}/chat`, {
@@ -325,9 +555,8 @@
           loadingBubble.remove();
 
           if (res.ok) {
-            addBubble(data.result, "skill");
+            renderInstructions(data.instructions);
           } else {
-            // แสดง error message จาก Gateway ตรงๆ — เป็น detail ที่ Gateway ได้รับจาก Skill Service
             addBubble(
               `เกิดข้อผิดพลาด (${res.status}): ${data.detail}`,
               "skill error"
@@ -338,15 +567,14 @@
           addBubble(`เชื่อมต่อ Gateway ไม่ได้: ${err.message}`, "skill error");
         } finally {
           sendBtn.disabled = false;
-          inputEl.disabled = false;
-          inputEl.focus();
+          docTextarea.disabled = false;
+          docTextarea.focus();
         }
       }
 
       formEl.addEventListener("submit", (e) => {
         e.preventDefault();
-        const typedText = inputEl.value.trim();
-
+        const typedText = docTextarea.value.trim();
         if (!typedText && !attachedFile) return;
 
         const displayText = attachedFile
@@ -356,8 +584,12 @@
           : typedText;
 
         const outgoingMessage = buildOutgoingMessage(typedText);
+        const currentDocument = resolveCurrentDocument(typedText);
 
-        inputEl.value = "";
+        // ไม่เคลียร์ textarea แบบโหมด chat เดิม — คงเอกสารไว้ให้เห็น
+        // สดๆ ตอนกด Approve (Document Updated)
+        docTextarea.value = currentDocument;
+
         attachedFile = null;
         attachmentBar.classList.remove("show");
 
