@@ -161,9 +161,7 @@ def health():
 def skills():
     """
     Capability discovery — บอก client ว่า Skill นี้ทำอะไรได้ โดยไม่ต้อง
-    เปิดเผย prompt หรือ implementation เลยแม้แต่นิดเดียว คืนเป็น list
-    เผื่ออนาคตขยายเป็นหลาย Skill ต่อ service (ตอนนี้ hardcode มีแค่ตัว
-    เดียวจาก manifest.json — ยังไม่มี Skill Registry จริง)
+    เปิดเผย prompt หรือ implementation เลย คืนเป็น list
     """
     return [SKILL_MANIFEST]
  
