@@ -1,602 +1,557 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="th">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Private Skills POC — Chat</title>
-    <style>
-      :root {
-        --bg: #0f172a;
-        --panel: #1e293b;
-        --border: #334155;
-        --text: #e2e8f0;
-        --muted: #94a3b8;
-        --accent: #6366f1;
-        --user-bubble: #6366f1;
-        --skill-bubble: #1e293b;
-        --error: #f87171;
-        --approve: #4ade80;
-        --old: #fca5a5;
-        --new: #86efac;
-      }
-      * {
-        box-sizing: border-box;
-      }
-      body {
-        margin: 0;
-        font-family: -apple-system, "Segoe UI", "Sarabun", sans-serif;
-        background: var(--bg);
-        color: var(--text);
-        height: 100vh;
-        display: flex;
-        flex-direction: column;
-      }
-      header {
-        padding: 16px 20px;
-        border-bottom: 1px solid var(--border);
-      }
-      header h1 {
-        margin: 0;
-        font-size: 16px;
-        font-weight: 600;
-      }
-      header .subtitle {
-        margin: 2px 0 0;
-        font-size: 12px;
-        color: var(--accent);
-        font-weight: 500;
-      }
-      header p.status-line {
-        margin: 6px 0 0;
-        font-size: 12px;
-        color: var(--muted);
-      }
-      #status-dot {
-        display: inline-block;
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: var(--muted);
-        margin-right: 6px;
-      }
-      #status-dot.ok {
-        background: #4ade80;
-      }
-      #status-dot.down {
-        background: var(--error);
-      }
+<head>
+<meta charset="UTF-8" />
+<title>Private Skills POC — Chat</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --border: #334155;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #6366f1;
+    --user-bubble: #6366f1;
+    --skill-bubble: #1e293b;
+    --error: #f87171;
+    --approve: #4ade80;
+    --old: #fca5a5;
+    --new: #86efac;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", "Sarabun", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+  }
+  header .subtitle {
+    margin: 2px 0 0;
+    font-size: 12px;
+    color: var(--accent);
+    font-weight: 500;
+  }
+  header p.status-line {
+    margin: 6px 0 0;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  #status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    margin-right: 6px;
+  }
+  #status-dot.ok { background: #4ade80; }
+  #status-dot.down { background: var(--error); }
 
-      #messages {
-        flex: 1;
-        overflow-y: auto;
-        padding: 20px;
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-      }
-      .bubble {
-        max-width: 70%;
-        padding: 10px 14px;
-        border-radius: 12px;
-        line-height: 1.5;
-        white-space: pre-wrap;
-        font-size: 14px;
-      }
-      .user {
-        align-self: flex-end;
-        background: var(--user-bubble);
-        color: white;
-        border-bottom-right-radius: 2px;
-      }
-      .skill {
-        align-self: flex-start;
-        background: var(--skill-bubble);
-        border: 1px solid var(--border);
-        border-bottom-left-radius: 2px;
-      }
-      .skill.error {
-        border-color: var(--error);
-        color: var(--error);
-      }
-      .skill.loading {
-        color: var(--muted);
-        font-style: italic;
-      }
+  #messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .bubble {
+    max-width: 70%;
+    padding: 10px 14px;
+    border-radius: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    font-size: 14px;
+  }
+  .user {
+    align-self: flex-end;
+    background: var(--user-bubble);
+    color: white;
+    border-bottom-right-radius: 2px;
+  }
+  .skill {
+    align-self: flex-start;
+    background: var(--skill-bubble);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 2px;
+  }
+  .skill.error {
+    border-color: var(--error);
+    color: var(--error);
+  }
+  .skill.loading {
+    color: var(--muted);
+    font-style: italic;
+  }
 
-      /* --- Instruction cards --- */
-      .instruction-list {
-        align-self: flex-start;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        max-width: 85%;
-        width: 100%;
-      }
-      .instruction-empty {
-        align-self: flex-start;
-        color: var(--muted);
-        font-size: 13px;
-        font-style: italic;
-        background: var(--skill-bubble);
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 10px 14px;
-      }
-      .card {
-        background: var(--skill-bubble);
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        padding: 12px 14px;
-        font-size: 13px;
-      }
-      .card.approved {
-        border-color: var(--approve);
-      }
-      .card-reason {
-        font-size: 12px;
-        color: var(--muted);
-        margin-bottom: 8px;
-      }
-      .card-reason::before {
-        content: "✓ ";
-      }
-      .card-divider {
-        border-top: 1px dashed var(--border);
-        margin: 8px 0;
-      }
-      .card-label {
-        font-size: 10px;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-        color: var(--muted);
-        margin-bottom: 3px;
-      }
-      .card-old {
-        background: rgba(248, 113, 113, 0.12);
-        color: var(--old);
-        text-decoration: line-through;
-        padding: 6px 8px;
-        border-radius: 6px;
-        margin-bottom: 6px;
-        white-space: pre-wrap;
-        word-break: break-word;
-      }
-      .card-arrow {
-        text-align: center;
-        color: var(--muted);
-        font-size: 12px;
-        margin: 2px 0;
-      }
-      .card-new {
-        background: rgba(134, 239, 172, 0.12);
-        color: var(--new);
-        padding: 6px 8px;
-        border-radius: 6px;
-        margin-bottom: 10px;
-        white-space: pre-wrap;
-        word-break: break-word;
-      }
-      .card-actions {
-        display: flex;
-        gap: 8px;
-      }
-      .card-actions button {
-        flex: 1;
-        padding: 6px 0;
-        border-radius: 6px;
-        border: 1px solid var(--border);
-        background: transparent;
-        color: var(--text);
-        font-size: 12px;
-        cursor: pointer;
-      }
-      .btn-approve:hover {
-        border-color: var(--approve);
-        color: var(--approve);
-      }
-      .btn-reject:hover {
-        border-color: var(--error);
-        color: var(--error);
-      }
-      .card.approved .btn-approve {
-        background: var(--approve);
-        color: #052e12;
-        border-color: var(--approve);
-        font-weight: 600;
-      }
-      .card-status {
-        font-size: 11px;
-        color: var(--muted);
-        margin-top: 6px;
-      }
-      .card-status.warn {
-        color: #fbbf24;
-      }
+  /* --- Instruction cards --- */
+  .instruction-list {
+    align-self: flex-start;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 85%;
+    width: 100%;
+  }
+  .instruction-empty {
+    align-self: flex-start;
+    color: var(--muted);
+    font-size: 13px;
+    font-style: italic;
+    background: var(--skill-bubble);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px 14px;
+  }
+  .card {
+    background: var(--skill-bubble);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 13px;
+  }
+  .card.approved { border-color: var(--approve); }
+  .card-reason {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .card-reason::before { content: "✓ "; }
+  .card-divider {
+    border-top: 1px dashed var(--border);
+    margin: 8px 0;
+  }
+  .card-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+  .card-old {
+    background: rgba(248, 113, 113, 0.12);
+    color: var(--old);
+    text-decoration: line-through;
+    padding: 6px 8px;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .card-arrow {
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    margin: 2px 0;
+  }
+  .card-new {
+    background: rgba(134, 239, 172, 0.12);
+    color: var(--new);
+    padding: 6px 8px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .card-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .card-actions button {
+    flex: 1;
+    padding: 6px 0;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .btn-approve:hover { border-color: var(--approve); color: var(--approve); }
+  .btn-reject:hover { border-color: var(--error); color: var(--error); }
+  .card.approved .btn-approve {
+    background: var(--approve);
+    color: #052e12;
+    border-color: var(--approve);
+    font-weight: 600;
+  }
+  .card-status {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+  .card-status.warn { color: #fbbf24; }
 
-      /* --- แนบไฟล์ --- */
-      #attachment-bar {
-        display: none;
-        align-items: center;
-        gap: 8px;
-        padding: 8px 20px;
-        border-top: 1px solid var(--border);
-        background: var(--panel);
-        font-size: 13px;
+  /* --- แนบไฟล์ --- */
+  #attachment-bar {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 20px;
+    border-top: 1px solid var(--border);
+    background: var(--panel);
+    font-size: 13px;
+  }
+  #attachment-bar.show { display: flex; }
+  #attachment-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--muted);
+  }
+  #attachment-remove {
+    background: none;
+    border: none;
+    color: var(--error);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 0 4px;
+  }
+
+  form {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+  }
+  #attach-btn {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    width: 40px;
+    height: 40px;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  #attach-btn:hover { border-color: var(--accent); }
+  textarea#document-textarea {
+    flex: 1;
+    padding: 10px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 44px;
+    max-height: 220px;
+    line-height: 1.5;
+  }
+  textarea#document-textarea:focus { outline: 1px solid var(--accent); }
+  button[type="submit"] {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    background: var(--accent);
+    color: white;
+    font-size: 14px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Private Skills POC</h1>
+  <p class="subtitle">Instruction-based Editing Prototype</p>
+  <p class="status-line"><span id="status-dot"></span><span id="status-text">กำลังเช็ค Gateway...</span></p>
+</header>
+
+<div id="messages"></div>
+
+<div id="attachment-bar">
+  <span>📎</span>
+  <span id="attachment-name"></span>
+  <button id="attachment-remove" type="button" title="เอาไฟล์ออก">✕</button>
+</div>
+
+<form id="chat-form">
+  <button id="attach-btn" type="button" title="แนบไฟล์เอกสาร">📎</button>
+  <input type="file" id="file-input" accept=".txt,.md,.csv,.json,.log" hidden />
+  <textarea
+    id="document-textarea"
+    rows="2"
+    placeholder="วางเอกสารที่ต้องการแก้ตรงนี้ หรือแนบไฟล์แล้วกดส่ง..."
+  ></textarea>
+  <button id="send-btn" type="submit">ส่ง</button>
+</form>
+
+<script>
+  // Gateway เป็นจุดเดียวที่ frontend รู้จัก — ไม่มีการเรียก
+  // Protected Skill Service ตรงๆ จาก frontend เด็ดขาด
+  const GATEWAY_URL = "http://127.0.0.1:8000";
+
+  const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024; // 2MB
+
+  const messagesEl = document.getElementById("messages");
+  const formEl = document.getElementById("chat-form");
+  const docTextarea = document.getElementById("document-textarea");
+  const sendBtn = document.getElementById("send-btn");
+  const statusDot = document.getElementById("status-dot");
+  const statusText = document.getElementById("status-text");
+
+  const attachBtn = document.getElementById("attach-btn");
+  const fileInput = document.getElementById("file-input");
+  const attachmentBar = document.getElementById("attachment-bar");
+  const attachmentName = document.getElementById("attachment-name");
+  const attachmentRemove = document.getElementById("attachment-remove");
+
+  let attachedFile = null; // { name, content } — ไม่แตะ logic นี้ตามที่ตกลง
+
+  function addBubble(text, role) {
+    const bubble = document.createElement("div");
+    bubble.className = `bubble ${role}`;
+    bubble.textContent = text;
+    messagesEl.appendChild(bubble);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return bubble;
+  }
+
+  async function checkHealth() {
+    try {
+      const res = await fetch(`${GATEWAY_URL}/health`);
+      if (res.ok) {
+        statusDot.className = "ok";
+        statusText.textContent = "Gateway เชื่อมต่อได้";
+      } else {
+        throw new Error("not ok");
       }
-      #attachment-bar.show {
-        display: flex;
-      }
-      #attachment-name {
-        flex: 1;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        color: var(--muted);
-      }
-      #attachment-remove {
-        background: none;
-        border: none;
-        color: var(--error);
-        cursor: pointer;
-        font-size: 16px;
-        padding: 0 4px;
-      }
+    } catch {
+      statusDot.className = "down";
+      statusText.textContent = "เชื่อมต่อ Gateway ไม่ได้ (เช็คว่ารัน uvicorn ที่ port 8000 อยู่หรือยัง)";
+    }
+  }
 
-      form {
-        display: flex;
-        align-items: flex-end;
-        gap: 8px;
-        padding: 16px 20px;
-        border-top: 1px solid var(--border);
-      }
-      #attach-btn {
-        background: var(--panel);
-        border: 1px solid var(--border);
-        color: var(--text);
-        width: 40px;
-        height: 40px;
-        border-radius: 8px;
-        font-size: 16px;
-        cursor: pointer;
-        flex-shrink: 0;
-      }
-      #attach-btn:hover {
-        border-color: var(--accent);
-      }
-      textarea#document-textarea {
-        flex: 1;
-        padding: 10px 14px;
-        border-radius: 8px;
-        border: 1px solid var(--border);
-        background: var(--panel);
-        color: var(--text);
-        font-size: 14px;
-        font-family: inherit;
-        resize: vertical;
-        min-height: 44px;
-        max-height: 220px;
-        line-height: 1.5;
-      }
-      textarea#document-textarea:focus {
-        outline: 1px solid var(--accent);
-      }
-      button[type="submit"] {
-        padding: 10px 20px;
-        border-radius: 8px;
-        border: none;
-        background: var(--accent);
-        color: white;
-        font-size: 14px;
-        cursor: pointer;
-        flex-shrink: 0;
-      }
-      button:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-      }
-    </style>
-  </head>
-  <body>
-    <header>
-      <h1>Private Skills POC</h1>
-      <p class="subtitle">Instruction-based Editing Prototype</p>
-      <p class="status-line">
-        <span id="status-dot"></span
-        ><span id="status-text">กำลังเช็ค Gateway...</span>
-      </p>
-    </header>
+  // --- แนบไฟล์ (ไม่แก้ logic เดิม) ---
 
-    <div id="messages"></div>
+  attachBtn.addEventListener("click", () => fileInput.click());
 
-    <div id="attachment-bar">
-      <span>📎</span>
-      <span id="attachment-name"></span>
-      <button id="attachment-remove" type="button" title="เอาไฟล์ออก">✕</button>
-    </div>
+  fileInput.addEventListener("change", () => {
+    const file = fileInput.files[0];
+    fileInput.value = "";
+    if (!file) return;
 
-    <form id="chat-form">
-      <button id="attach-btn" type="button" title="แนบไฟล์เอกสาร">📎</button>
-      <input
-        type="file"
-        id="file-input"
-        accept=".txt,.md,.csv,.json,.log"
-        hidden
-      />
-      <textarea
-        id="document-textarea"
-        rows="2"
-        placeholder="วางเอกสารที่ต้องการแก้ตรงนี้ หรือแนบไฟล์แล้วกดส่ง..."
-      ></textarea>
-      <button id="send-btn" type="submit">ส่ง</button>
-    </form>
+    if (file.size > MAX_FILE_SIZE_BYTES) {
+      addBubble(`ไฟล์ใหญ่เกินไป (จำกัดไม่เกิน ${MAX_FILE_SIZE_BYTES / 1024 / 1024}MB สำหรับ POC นี้)`, "skill error");
+      return;
+    }
 
-    <script>
-      // Gateway เป็นจุดเดียวที่ frontend รู้จัก — ไม่มีการเรียก Protected Skill Service ตรงๆ จาก frontend
-      const GATEWAY_URL = "http://127.0.0.1:8000";
+    const reader = new FileReader();
+    reader.onload = () => {
+      attachedFile = { name: file.name, content: reader.result };
+      attachmentName.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+      attachmentBar.classList.add("show");
+    };
+    reader.onerror = () => {
+      addBubble(`อ่านไฟล์ "${file.name}" ไม่สำเร็จ — รองรับเฉพาะไฟล์ text (.txt, .md, .csv, .json, .log)`, "skill error");
+    };
+    reader.readAsText(file);
+  });
 
-      const MAX_FILE_SIZE_BYTES = 2 * 1024 * 1024;
+  attachmentRemove.addEventListener("click", () => {
+    attachedFile = null;
+    attachmentBar.classList.remove("show");
+  });
 
-      const messagesEl = document.getElementById("messages");
-      const formEl = document.getElementById("chat-form");
-      const docTextarea = document.getElementById("document-textarea");
-      const sendBtn = document.getElementById("send-btn");
-      const statusDot = document.getElementById("status-dot");
-      const statusText = document.getElementById("status-text");
+  function buildOutgoingMessage(typedText) {
+    if (!attachedFile) return typedText;
+    const header = `[แนบไฟล์: ${attachedFile.name}]`;
+    if (typedText) {
+      return `${typedText}\n\n${header}\n${attachedFile.content}`;
+    }
+    return `${header}\n${attachedFile.content}`;
+  }
 
-      const attachBtn = document.getElementById("attach-btn");
-      const fileInput = document.getElementById("file-input");
-      const attachmentBar = document.getElementById("attachment-bar");
-      const attachmentName = document.getElementById("attachment-name");
-      const attachmentRemove = document.getElementById("attachment-remove");
+  // ตัดสินใจว่า "เอกสาร" ที่จะใช้ apply instruction คืออะไร:
+  // มีไฟล์แนบ -> ไฟล์คือเอกสาร (textarea ถือเป็นคำสั่งเสริม)
+  // ไม่มีไฟล์แนบ -> ข้อความใน textarea เองคือเอกสาร
+  function resolveCurrentDocument(typedText) {
+    return attachedFile ? attachedFile.content : typedText;
+  }
 
-      let attachedFile = null;
+  // --- Instruction Cards ---
 
-      function addBubble(text, role) {
-        const bubble = document.createElement("div");
-        bubble.className = `bubble ${role}`;
-        bubble.textContent = text;
-        messagesEl.appendChild(bubble);
-        messagesEl.scrollTop = messagesEl.scrollHeight;
-        return bubble;
-      }
+  function applyInstruction(instruction, card, statusEl, approveBtn) {
+    if (!docTextarea.value.includes(instruction.old_str)) {
+      statusEl.textContent = "⚠️ ไม่พบข้อความนี้ในเอกสาร (อาจถูกแก้ไปแล้ว หรือไม่ตรงกับเอกสารปัจจุบัน)";
+      statusEl.classList.add("warn");
+      return;
+    }
+    docTextarea.value = docTextarea.value.replace(instruction.old_str, instruction.new_str);
+    card.classList.add("approved");
+    approveBtn.disabled = true;
+    statusEl.textContent = "✅ Applied — Document Updated";
+    statusEl.classList.remove("warn");
+  }
 
-      async function checkHealth() {
-        try {
-          const res = await fetch(`${GATEWAY_URL}/health`);
-          if (res.ok) {
-            statusDot.className = "ok";
-            statusText.textContent = "Gateway เชื่อมต่อได้";
-          } else {
-            throw new Error("not ok");
-          }
-        } catch {
-          statusDot.className = "down";
-          statusText.textContent =
-            "เชื่อมต่อ Gateway ไม่ได้ (เช็คว่ารัน uvicorn ที่ port 8000 หรือไม่)";
-        }
-      }
+  function renderInstructionCard(instruction) {
+    const card = document.createElement("div");
+    card.className = "card";
 
-      // --- แนบไฟล์ (ไม่แก้ logic เดิม) ---
+    const reasonEl = document.createElement("div");
+    reasonEl.className = "card-reason";
+    reasonEl.textContent = instruction.reason;
 
-      attachBtn.addEventListener("click", () => fileInput.click());
+    const dividerEl = document.createElement("div");
+    dividerEl.className = "card-divider";
 
-      fileInput.addEventListener("change", () => {
-        const file = fileInput.files[0];
-        fileInput.value = "";
-        if (!file) return;
+    const oldLabel = document.createElement("div");
+    oldLabel.className = "card-label";
+    oldLabel.textContent = "Old";
+    const oldEl = document.createElement("div");
+    oldEl.className = "card-old";
+    oldEl.textContent = instruction.old_str;
 
-        if (file.size > MAX_FILE_SIZE_BYTES) {
-          addBubble(
-            `ไฟล์ใหญ่เกินไป (จำกัดไม่เกิน ${MAX_FILE_SIZE_BYTES / 1024 / 1024}MB สำหรับ POC นี้)`,
-            "skill error"
-          );
-          return;
-        }
+    const arrowEl = document.createElement("div");
+    arrowEl.className = "card-arrow";
+    arrowEl.textContent = "↓";
 
-        const reader = new FileReader();
-        reader.onload = () => {
-          attachedFile = { name: file.name, content: reader.result };
-          attachmentName.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
-          attachmentBar.classList.add("show");
-        };
-        reader.onerror = () => {
-          addBubble(
-            `อ่านไฟล์ "${file.name}" ไม่สำเร็จ — รองรับเฉพาะไฟล์ text (.txt, .md, .csv, .json, .log)`,
-            "skill error"
-          );
-        };
-        reader.readAsText(file);
+    const newLabel = document.createElement("div");
+    newLabel.className = "card-label";
+    newLabel.textContent = "New";
+    const newEl = document.createElement("div");
+    newEl.className = "card-new";
+    newEl.textContent = instruction.new_str;
+
+    const actionsEl = document.createElement("div");
+    actionsEl.className = "card-actions";
+
+    const approveBtn = document.createElement("button");
+    approveBtn.type = "button";
+    approveBtn.className = "btn-approve";
+    approveBtn.textContent = "Approve";
+
+    const rejectBtn = document.createElement("button");
+    rejectBtn.type = "button";
+    rejectBtn.className = "btn-reject";
+    rejectBtn.textContent = "Reject";
+
+    const statusEl = document.createElement("div");
+    statusEl.className = "card-status";
+
+    approveBtn.addEventListener("click", () => {
+      applyInstruction(instruction, card, statusEl, approveBtn);
+    });
+
+    // Reject = ลบ card ออกจากหน้าจอเลย ตามที่ตกลง
+    rejectBtn.addEventListener("click", () => card.remove());
+
+    actionsEl.appendChild(approveBtn);
+    actionsEl.appendChild(rejectBtn);
+
+    card.appendChild(reasonEl);
+    card.appendChild(dividerEl);
+    card.appendChild(oldLabel);
+    card.appendChild(oldEl);
+    card.appendChild(arrowEl);
+    card.appendChild(newLabel);
+    card.appendChild(newEl);
+    card.appendChild(actionsEl);
+    card.appendChild(statusEl);
+
+    return card;
+  }
+
+  function renderInstructions(instructions) {
+    if (instructions.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "instruction-empty";
+      empty.textContent = "ไม่พบจุดที่ต้องแก้ไข";
+      messagesEl.appendChild(empty);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      return;
+    }
+
+    const list = document.createElement("div");
+    list.className = "instruction-list";
+    instructions.forEach((instruction) => {
+      list.appendChild(renderInstructionCard(instruction));
+    });
+    messagesEl.appendChild(list);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  // --- ส่งข้อความ ---
+
+  async function sendMessage(displayText, outgoingMessage) {
+    addBubble(displayText, "user");
+    const loadingBubble = addBubble("กำลังวิเคราะห์...", "skill loading");
+
+    sendBtn.disabled = true;
+    docTextarea.disabled = true;
+
+    try {
+      const res = await fetch(`${GATEWAY_URL}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          skill: "document-edit",
+          input: { document: outgoingMessage },
+        }),
       });
 
-      attachmentRemove.addEventListener("click", () => {
-        attachedFile = null;
-        attachmentBar.classList.remove("show");
-      });
+      const data = await res.json();
 
-      function buildOutgoingMessage(typedText) {
-        if (!attachedFile) return typedText;
-        const header = `[แนบไฟล์: ${attachedFile.name}]`;
-        if (typedText) {
-          return `${typedText}\n\n${header}\n${attachedFile.content}`;
-        }
-        return `${header}\n${attachedFile.content}`;
+      loadingBubble.remove();
+
+      if (res.ok) {
+        renderInstructions(data.instructions);
+      } else {
+        addBubble(`เกิดข้อผิดพลาด (${res.status}): ${data.detail}`, "skill error");
       }
+    } catch (err) {
+      loadingBubble.remove();
+      addBubble(`เชื่อมต่อ Gateway ไม่ได้: ${err.message}`, "skill error");
+    } finally {
+      sendBtn.disabled = false;
+      docTextarea.disabled = false;
+      docTextarea.focus();
+    }
+  }
 
-      // ตัดสินใจว่า "เอกสาร" ที่จะใช้ apply instruction คืออะไร:
-      // มีไฟล์แนบ -> ไฟล์คือเอกสาร (textarea ถือเป็นคำสั่งเสริม)
-      // ไม่มีไฟล์แนบ -> ข้อความใน textarea เองคือเอกสาร
-      function resolveCurrentDocument(typedText) {
-        return attachedFile ? attachedFile.content : typedText;
-      }
+  formEl.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const typedText = docTextarea.value.trim();
+    if (!typedText && !attachedFile) return;
 
-      // --- Instruction Cards ---
+    const displayText = attachedFile
+      ? (typedText ? `${typedText}  📎 ${attachedFile.name}` : `📎 ${attachedFile.name}`)
+      : typedText;
 
-      function applyInstruction(instruction, card, statusEl, approveBtn) {
-        if (!docTextarea.value.includes(instruction.old_str)) {
-          statusEl.textContent =
-            "⚠️ ไม่พบข้อความนี้ในเอกสาร (อาจถูกแก้ไปแล้ว หรือไม่ตรงกับเอกสารปัจจุบัน)";
-          statusEl.classList.add("warn");
-          return;
-        }
-        docTextarea.value = docTextarea.value.replace(
-          instruction.old_str,
-          instruction.new_str
-        );
-        card.classList.add("approved");
-        approveBtn.disabled = true;
-        statusEl.textContent = "✅ Applied — Document Updated";
-        statusEl.classList.remove("warn");
-      }
+    const outgoingMessage = buildOutgoingMessage(typedText);
+    const currentDocument = resolveCurrentDocument(typedText);
 
-      function renderInstructionCard(instruction) {
-        const card = document.createElement("div");
-        card.className = "card";
+    // ไม่เคลียร์ textarea แบบโหมด chat เดิม — คงเอกสารไว้ให้เห็น
+    // สดๆ ตอนกด Approve (Document Updated)
+    docTextarea.value = currentDocument;
 
-        const reasonEl = document.createElement("div");
-        reasonEl.className = "card-reason";
-        reasonEl.textContent = instruction.reason;
+    attachedFile = null;
+    attachmentBar.classList.remove("show");
 
-        const dividerEl = document.createElement("div");
-        dividerEl.className = "card-divider";
+    sendMessage(displayText, outgoingMessage);
+  });
 
-        const oldLabel = document.createElement("div");
-        oldLabel.className = "card-label";
-        oldLabel.textContent = "Old";
-        const oldEl = document.createElement("div");
-        oldEl.className = "card-old";
-        oldEl.textContent = instruction.old_str;
+  checkHealth();
+</script>
 
-        const arrowEl = document.createElement("div");
-        arrowEl.className = "card-arrow";
-        arrowEl.textContent = "↓";
-
-        const newLabel = document.createElement("div");
-        newLabel.className = "card-label";
-        newLabel.textContent = "New";
-        const newEl = document.createElement("div");
-        newEl.className = "card-new";
-        newEl.textContent = instruction.new_str;
-
-        const actionsEl = document.createElement("div");
-        actionsEl.className = "card-actions";
-
-        const approveBtn = document.createElement("button");
-        approveBtn.type = "button";
-        approveBtn.className = "btn-approve";
-        approveBtn.textContent = "Approve";
-
-        const rejectBtn = document.createElement("button");
-        rejectBtn.type = "button";
-        rejectBtn.className = "btn-reject";
-        rejectBtn.textContent = "Reject";
-
-        const statusEl = document.createElement("div");
-        statusEl.className = "card-status";
-
-        approveBtn.addEventListener("click", () => {
-          applyInstruction(instruction, card, statusEl, approveBtn);
-        });
-
-        // Reject = ลบ card ออกจากหน้าจอเลย ตามที่ตกลง
-        rejectBtn.addEventListener("click", () => card.remove());
-
-        actionsEl.appendChild(approveBtn);
-        actionsEl.appendChild(rejectBtn);
-
-        card.appendChild(reasonEl);
-        card.appendChild(dividerEl);
-        card.appendChild(oldLabel);
-        card.appendChild(oldEl);
-        card.appendChild(arrowEl);
-        card.appendChild(newLabel);
-        card.appendChild(newEl);
-        card.appendChild(actionsEl);
-        card.appendChild(statusEl);
-
-        return card;
-      }
-
-      function renderInstructions(instructions) {
-        if (instructions.length === 0) {
-          const empty = document.createElement("div");
-          empty.className = "instruction-empty";
-          empty.textContent = "ไม่พบจุดที่ต้องแก้ไข";
-          messagesEl.appendChild(empty);
-          messagesEl.scrollTop = messagesEl.scrollHeight;
-          return;
-        }
-
-        const list = document.createElement("div");
-        list.className = "instruction-list";
-        instructions.forEach((instruction) => {
-          list.appendChild(renderInstructionCard(instruction));
-        });
-        messagesEl.appendChild(list);
-        messagesEl.scrollTop = messagesEl.scrollHeight;
-      }
-
-      // --- ส่งข้อความ ---
-
-      async function sendMessage(displayText, outgoingMessage) {
-        addBubble(displayText, "user");
-        const loadingBubble = addBubble("กำลังวิเคราะห์...", "skill loading");
-
-        sendBtn.disabled = true;
-        docTextarea.disabled = true;
-
-        try {
-          const res = await fetch(`${GATEWAY_URL}/chat`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: outgoingMessage })
-          });
-
-          const data = await res.json();
-
-          loadingBubble.remove();
-
-          if (res.ok) {
-            renderInstructions(data.instructions);
-          } else {
-            addBubble(
-              `เกิดข้อผิดพลาด (${res.status}): ${data.detail}`,
-              "skill error"
-            );
-          }
-        } catch (err) {
-          loadingBubble.remove();
-          addBubble(`เชื่อมต่อ Gateway ไม่ได้: ${err.message}`, "skill error");
-        } finally {
-          sendBtn.disabled = false;
-          docTextarea.disabled = false;
-          docTextarea.focus();
-        }
-      }
-
-      formEl.addEventListener("submit", (e) => {
-        e.preventDefault();
-        const typedText = docTextarea.value.trim();
-        if (!typedText && !attachedFile) return;
-
-        const displayText = attachedFile
-          ? typedText
-            ? `${typedText}  📎 ${attachedFile.name}`
-            : `📎 ${attachedFile.name}`
-          : typedText;
-
-        const outgoingMessage = buildOutgoingMessage(typedText);
-        const currentDocument = resolveCurrentDocument(typedText);
-
-        // ไม่เคลียร์ textarea แบบโหมด chat เดิม — คงเอกสารไว้ให้เห็น
-        // สดๆ ตอนกด Approve (Document Updated)
-        docTextarea.value = currentDocument;
-
-        attachedFile = null;
-        attachmentBar.classList.remove("show");
-
-        sendMessage(displayText, outgoingMessage);
-      });
-
-      checkHealth();
-    </script>
-  </body>
+</body>
 </html>

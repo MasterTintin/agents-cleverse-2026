@@ -1,0 +1,23 @@
+{
+  "id": "document-edit",
+  "name": "Document Edit Skill",
+  "version": "v1",
+  "status": "available",
+  "provider": "Cleverse",
+  "capabilities": ["document-edit"],
+  "endpoint": "/execute",
+  "method": "POST",
+  "description": "Analyze a document and return edit instructions.",
+  "input": {
+    "document": "string"
+  },
+  "output": {
+    "instructions": [
+      {
+        "old_str": "string",
+        "new_str": "string",
+        "reason": "string"
+      }
+    ]
+  }
+}

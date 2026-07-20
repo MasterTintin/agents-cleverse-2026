@@ -5,91 +5,156 @@ Skill Gateway
 
 หน้าที่: รับ request จาก user, forward เฉพาะ input ที่จำเป็นไปยัง
 Protected Skill Service, แล้วส่ง instructions กลับ — Gateway ไม่มีวันเห็น
-หรือเก็บ prompt/business logic ลับไว้เลย (ของแบบนั้นอยู่ใน
-protected_skill_service/prompt.py เท่านั้น)
+หรือเก็บ prompt/business logic ลับไว้
 
-Phase 1 (ดู docs/research/12-file-edit-approach.md) เปลี่ยน response ของ
+Phase 1 (ดู docs/research/file-edit-approach.md) เปลี่ยน response ของ
 Protected Skill จาก {"result": str} เป็น
 {"instructions": [{old_str, new_str, reason}]} — Gateway แค่ relay shape
-ใหม่นี้ต่อไปเฉยๆ ไม่ได้ตีความหรือแตะเนื้อหาข้างใน
+ใหม่นี้ต่อไป
 
-สำหรับ POC นี้ (Out of Scope: Registry) Gateway hardcode ไว้เลยว่า
-ทุก request ที่เข้ามาคือ Protected Skill เดียว ไม่มี logic ตรวจจับ/
-เลือก skill หลายตัว
+Capability Discovery: GET /skills คืนรายการ Skill ทั้งหมดที่ระบบรู้จัก
+แบ่งเป็น 2 กลุ่ม — Skill ที่มี service จริงรองรับ (status: available,
+relay มาจาก Protected Skill Service ตรงๆ) และ Skill ที่ "วางโครงไว้"
+แต่ยังไม่ implement (status: planned, hardcode เป็น stub ใน Gateway
+เอง) การแยกแบบนี้ทำให้เห็นว่าระบบขยายเป็นหลาย Skill ได้โดยไม่ต้องรื้อ
+API contract แต่ยังไม่ต้องสร้าง Skill Registry เต็มรูปแบบ
 """
 
 import os
-
+ 
 import httpx
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-
+ 
 load_dotenv()
-
+ 
 GATEWAY_PORT = int(os.getenv("GATEWAY_PORT", "8000"))
 SKILL_SERVICE_URL = os.getenv("SKILL_SERVICE_URL", "http://127.0.0.1:8001")
 REQUEST_TIMEOUT_SECONDS = 30
-
+ 
+# Public contract ที่ client ต้องเรียกจริง — ผ่าน Gateway เท่านั้น
+PUBLIC_ENDPOINT = "/chat"
+PUBLIC_METHOD = "POST"
+PLANNED_SKILLS = [
+    {
+        "id": "resume-review",
+        "name": "Resume Review Skill",
+        "version": "v1",
+        "status": "planned",
+        "provider": "Cleverse",
+        "capabilities": ["resume-review"],
+        "endpoint": PUBLIC_ENDPOINT,
+        "method": PUBLIC_METHOD,
+        "description": "Review resumes against internal hiring criteria.",
+    },
+    {
+        "id": "grammar-check",
+        "name": "Grammar Check Skill",
+        "version": "v1",
+        "status": "planned",
+        "provider": "Cleverse",
+        "capabilities": ["grammar-check"],
+        "endpoint": PUBLIC_ENDPOINT,
+        "method": PUBLIC_METHOD,
+        "description": "Check grammar and style issues in documents.",
+    },
+    {
+        "id": "pii-redaction",
+        "name": "PII Redaction Skill",
+        "version": "v1",
+        "status": "planned",
+        "provider": "Cleverse",
+        "capabilities": ["pii-redaction"],
+        "endpoint": PUBLIC_ENDPOINT,
+        "method": PUBLIC_METHOD,
+        "description": "Detect and redact PII from documents.",
+    },
+]
+ 
 app = FastAPI(title="Skill Gateway")
-
-# เปิด CORS แบบกว้างสำหรับ POC เท่านั้น — ของจริงต้องจำกัด origin ให้แคบกว่านี้
+ 
+# เปิด CORS แบบกว้างสำหรับ POC เท่านั้น— ของจริงต้องจำกัด origin ให้แคบกว่านี้
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
+ 
+ 
 class ChatRequest(BaseModel):
-    message: str
-
-
+    skill: str = "document-edit"
+    input: dict
+ 
+ 
 class Instruction(BaseModel):
     old_str: str
     new_str: str
     reason: str
-
-
+ 
+ 
 class ChatResponse(BaseModel):
     instructions: list[Instruction]
-
-
-def is_protected_skill_request(message: str) -> bool:
+ 
+ 
+def has_valid_input(input_data: dict) -> bool:
     """
-    Detect ว่า request นี้ควร route ไป Protected Skill หรือไม่
-
-    POC นี้มี Skill เดียวและ hardcode ไว้ว่า route ทุกครั้ง (ตาม
-    Out of Scope: ไม่มี Registry/หลาย Skill) — ฟังก์ชันนี้แยกออกมา
-    ต่างหากเพื่อให้เห็นชัดว่า "จุดตัดสินใจ" อยู่ตรงไหน เผื่อขยายเป็น
-    intent detection จริงในอนาคต (ดู Architecture Hypothesis ใน
-    docs/research/07-capafy-competitor-analysis.md)
+    เช็คระดับ shape เท่านั้น (dict ต้องไม่ว่าง) — Gateway ไม่ตีความว่า
+    ข้างในควรมี field อะไรบ้าง เพราะแต่ละ Skill ต้องการ input ต่างกัน
+    การตรวจ field ที่จำเป็นจริงๆ เป็นหน้าที่ของ Protected Skill Service
     """
-    return bool(message.strip())
-
-
-def call_protected_skill(message: str) -> list[dict]:
+    return bool(input_data)
+ 
+ 
+def get_implemented_skill_ids() -> set[str]:
     """
-    ยิง request ไปยัง Protected Skill Service แล้วคืนแค่ instructions
-
-    รับ parameter ชื่อ `message` เพราะในมุมของ Gateway มันคือแค่ข้อความ
-    ดิบจาก user เท่านั้น — Gateway ไม่มีหน้าที่ตีความว่าข้อความนี้คือ
-    resume, invoice หรือ document ประเภทไหน การตีความความหมายเป็นหน้าที่
-    ของ Protected Skill Service
-    Gateway ส่งแค่ field ที่ Protected Skill Service คาดหวัง
-    เท่านั้น ไม่มีการแนบข้อมูลอื่นที่ไม่เกี่ยวข้อง และไม่มีทางเห็น
-    system prompt ที่ใช้ประมวลผลอยู่เบื้องหลังเลย — Gateway เห็นแค่
-    old_str/new_str/reason ที่ Protected Skill ตัดสินใจส่งกลับมาแล้ว
-    ไม่เห็นว่า Claude คิดยังไงถึงได้คำตอบนี้
+    ดึงรายชื่อ skill ที่ status == "available" จาก Protected Skill
+    Service ตรงๆ แทนการ hardcode set คงที่แบบเดิม — ลด duplication
+    ระหว่าง manifest.json (source of truth จริง) กับ Gateway
+ 
+    หมายเหตุ: เรียก network request ทุกครั้งที่ /chat ถูกยิง ไม่มี cache
+    เพื่อความถูกต้องเสมอ (ไม่มี stale state ให้กังวล) แลกกับ latency ที่
+    เพิ่มขึ้นเล็กน้อย — trade-off ที่ยอมรับได้สำหรับ POC ขนาดนี้ ถ้า
+    traffic สูงขึ้นค่อยเพิ่ม cache/TTL ทีหลัง
+    """
+    try:
+        response = httpx.get(
+            f"{SKILL_SERVICE_URL}/skills", timeout=REQUEST_TIMEOUT_SECONDS
+        )
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        raise RuntimeError(
+            f"ดึงรายชื่อ skill ไม่สำเร็จ: {exc.response.status_code}"
+        ) from exc
+    except httpx.RequestError as exc:
+        raise RuntimeError(f"เชื่อมต่อ Protected Skill Service ไม่ได้: {exc}") from exc
+ 
+    return {s["id"] for s in response.json() if s.get("status") == "available"}
+ 
+ 
+def invoke_skill(skill_id: str, input_data: dict) -> list[dict]:
+    """
+    เรียก Protected Skill Service แล้วคืนแค่ instructions
+ 
+    รับ input_data เป็น dict อิสระแล้ว forward ทั้งก้อนไปเป็น JSON body
+    ตรงๆ — Gateway ไม่ต้องรู้เลยว่า field ข้างในชื่ออะไรบ้าง (document?
+    resume? invoice?) ปล่อยให้ Protected Skill Service ตีความเอง
+    (Separation of Concerns) ไม่มีทางเห็น system prompt ที่ใช้ประมวลผล
+    อยู่เบื้องหลังเลย — Gateway เห็นแค่ old_str/new_str/reason ที่
+    Protected Skill ตัดสินใจส่งกลับมาแล้ว ไม่เห็นว่า Claude คิดยังไงถึง
+    ได้คำตอบนี้
+ 
+    หมายเหตุ: skill_id รับไว้เผื่ออนาคตต้อง route ไปหลาย service ตาม
+    skill ที่ขอ
     """
     try:
         # Gateway forwards only user input.
         # Secret prompt remains inside Protected Skill Service.
         response = httpx.post(
             f"{SKILL_SERVICE_URL}/execute",
-            json={"document": message},
+            json=input_data,
             timeout=REQUEST_TIMEOUT_SECONDS,
         )
         response.raise_for_status()
@@ -99,38 +164,88 @@ def call_protected_skill(message: str) -> list[dict]:
         ) from exc
     except httpx.RequestError as exc:
         raise RuntimeError(f"เชื่อมต่อ Protected Skill Service ไม่ได้: {exc}") from exc
-
+ 
     return response.json()["instructions"]
-
-
+ 
+ 
+def to_public_manifest(skill: dict) -> dict:
+    """
+    เขียนทับ endpoint/method ของ manifest ที่ relay มาจาก Protected
+    Skill Service ให้เป็น public contract จริง (ผ่าน Gateway) แทนที่
+    endpoint ภายในของ service เอง (/execute) — Gateway เป็น trust
+    boundary ที่รู้ว่า client ควรเห็นอะไร ไม่ใช่ปล่อยให้ internal
+    implementation detail หลุดผ่าน manifest ไปตรงๆ
+    """
+    public_skill = dict(skill)
+    public_skill["endpoint"] = PUBLIC_ENDPOINT
+    public_skill["method"] = PUBLIC_METHOD
+    return public_skill
+ 
+ 
 @app.get("/health")
 def health():
     return {"status": "ok"}
-
-
+ 
+ 
+@app.get("/skills")
+def skills():
+    """
+    Capability discovery — คืนทั้ง Skill ที่ใช้งานได้จริง
+    รวมกันเป็น list เดียว แต่ละรายการมี "status" บอกชัดว่าอันไหนใช้ได้
+    จริง อันไหนยังไม่มี service หลังบ้าน
+    """
+    try:
+        response = httpx.get(
+            f"{SKILL_SERVICE_URL}/skills", timeout=REQUEST_TIMEOUT_SECONDS
+        )
+        response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Protected Skill Service ตอบกลับผิดพลาด: {exc.response.status_code}",
+        ) from exc
+    except httpx.RequestError as exc:
+        raise HTTPException(
+            status_code=502, detail=f"เชื่อมต่อ Protected Skill Service ไม่ได้: {exc}"
+        ) from exc
+ 
+    real_skills = [to_public_manifest(s) for s in response.json()]
+    return real_skills + PLANNED_SKILLS
+ 
+ 
 @app.post("/chat", response_model=ChatResponse)
 def chat(payload: ChatRequest):
     """
     Endpoint ที่ frontend เรียก — ทำหน้าที่แค่ route + forward เท่านั้น
-    ไม่มี business logic ของ skill อยู่ในนี้
+    ไม่มี business logic ของ skill อยู่ในนี้เลย
+ 
+    เช็ค payload.skill ก่อน forward เสมอ โดยดึงรายชื่อ skill ที่
+    implement จริงมาจาก manifest สดๆ (ไม่ hardcode) — ถ้าเป็น skill ที่
+    ยังไม่มี service จริงรองรับ ต้องตอบ 501 ชัดเจน
     """
-    if not payload.message.strip():
-        raise HTTPException(status_code=400, detail="message ต้องไม่ว่างเปล่า")
-
-    if not is_protected_skill_request(payload.message):
-        raise HTTPException(
-            status_code=404, detail="ไม่พบ Skill ที่ตรงกับคำขอ"
-        )
-
+    if not has_valid_input(payload.input):
+        raise HTTPException(status_code=400, detail="input ต้องไม่ว่างเปล่า")
+ 
     try:
-        instructions = call_protected_skill(payload.message)
+        implemented_ids = get_implemented_skill_ids()
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-
+ 
+    if payload.skill not in implemented_ids:
+        raise HTTPException(
+            status_code=501,
+            detail=f"Skill '{payload.skill}' ยังไม่มี service รองรับ (status: planned)",
+        )
+ 
+    try:
+        instructions = invoke_skill(payload.skill, payload.input)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+ 
     return ChatResponse(instructions=instructions)
-
-
+ 
+ 
 if __name__ == "__main__":
     import uvicorn
-
+ 
     uvicorn.run(app, host="0.0.0.0", port=GATEWAY_PORT)
