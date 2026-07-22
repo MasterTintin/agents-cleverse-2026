@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<title>Embedded Enterprise Skills — Document Review Panel</title>
+<style>
+  :root {
+    --toolbar: #f1f3f4;
+    --border: #dadce0;
+    --text: #202124;
+    --muted: #5f6368;
+    --blue: #1a73e8;
+    --ins: #188038;
+    --ins-bg: #e6f4ea;
+    --del: #d93025;
+    --del-bg: #fce8e6;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", -apple-system, "Sarabun", sans-serif;
+    background: #e8eaed;
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* --- Fake app chrome --- */
+  .menubar {
+    background: white;
+    border-bottom: 1px solid var(--border);
+    padding: 8px 16px 0;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .menubar .doc-icon { width: 28px; height: 28px; background: var(--blue); border-radius: 4px; }
+  .menubar .titles { display: flex; flex-direction: column; }
+  .menubar .doc-title { font-size: 14px; }
+  .menubar .menu-items { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .toolbar {
+    background: var(--toolbar);
+    border-bottom: 1px solid var(--border);
+    padding: 6px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .toolbar .pill {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 10px;
+  }
+  .toolbar .suggesting {
+    margin-left: auto;
+    background: var(--ins-bg);
+    color: var(--ins);
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-weight: 600;
+  }
+
+  /* --- Body: document + suggestions rail --- */
+  .body {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    background: #e8eaed;
+  }
+  .doc-scroll { flex: 1; overflow-y: auto; padding: 40px 0; }
+  .page {
+    background: white;
+    width: 700px;
+    min-height: 850px;
+    margin: 0 auto;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+    padding: 60px 70px;
+    font-size: 14px;
+    line-height: 2;
+  }
+  .page h2 { font-size: 18px; margin-top: 0; }
+  .page del { color: var(--del); background: var(--del-bg); text-decoration: line-through; }
+  .page ins { color: var(--ins); background: var(--ins-bg); text-decoration: none; }
+
+  .rail {
+    width: 300px;
+    background: white;
+    border-left: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 16px 14px;
+  }
+  .rail h3 { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 4px 0 12px; }
+  .suggestion {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+    font-size: 12.5px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  }
+  .suggestion .who {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .avatar {
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--blue); color: white;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700;
+  }
+  .suggestion .name { font-weight: 600; }
+  .meta{
+    font-size:11px;
+    color:#5f6368;
+    margin-top:2px;
+}
+
+.reason{
+    margin-top:10px;
+    padding-top:8px;
+    border-top:1px solid #eee;
+    font-size:11px;
+    color:#5f6368;
+    line-height:1.6;
+}
+  .suggestion .diff { line-height: 1.6; margin-bottom: 8px; }
+  .suggestion .diff del { color: var(--del); background: var(--del-bg); text-decoration: line-through; }
+  .suggestion .diff ins { color: var(--ins); background: var(--ins-bg); text-decoration: none; }
+  .suggestion .actions { display: flex; gap: 6px; }
+  .suggestion .actions button {
+    flex: 1;
+    border: 1px solid var(--border);
+    background: white;
+    border-radius: 6px;
+    padding: 5px 0;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .suggestion .actions .accept { color: var(--ins); border-color: var(--ins); }
+  .suggestion .actions .reject { color: var(--del); border-color: var(--del); }
+  .footer-note {
+    font-size: 11px;
+    color: var(--muted);
+    padding: 10px 4px 4px;
+    border-top: 1px solid var(--border);
+    margin-top: 4px;
+  }
+</style>
+</head>
+<body>
+
+<div class="menubar">
+  <div class="doc-icon"></div>
+  <div class="titles">
+    <div class="doc-title">สัญญาจ้างงาน — ฉบับร่าง</div>
+    <div class="menu-items"><span>ไฟล์</span><span>แก้ไข</span><span>ดู</span><span>แทรก</span><span>รูปแบบ</span></div>
+  </div>
+</div>
+
+<div class="toolbar">
+  <span class="pill">100%</span>
+  <span class="pill">Sarabun</span>
+  <span class="pill">14</span>
+
+  <span class="suggesting">
+    ● กำลังวิเคราะห์เอกสาร • Powered by Private Skills
+  </span>
+</div>
+
+<div class="body">
+  <div class="doc-scroll">
+    <div class="page">
+      <h2>Employment Agreement</h2>
+        <p style="color:#5f6368;font-size:12px;">
+        Draft Version • HR Department
+        </p>
+      <p>บริษัทตกลงจ้าง <del>ลูกจ้างเป็นระยะเวลา 6 เดือน</del><ins>ลูกจ้างเป็นระยะเวลา 1 ปี นับจากวันที่เริ่มปฏิบัติงาน</ins> โดยมีระยะเวลาทดลองงาน 90 วันตามนโยบายบริษัท</p>
+      <p>ลูกจ้างจะได้รับค่าตอบแทน<del>ตามที่ตกลงกันด้วยวาจา</del><ins>ตามอัตราที่ระบุไว้ในเอกสารแนบท้ายสัญญาฉบับนี้</ins> และสวัสดิการตามที่บริษัทกำหนด</p>
+      <p>สัญญาฉบับนี้อยู่ภายใต้กฎหมายแรงงานไทย และให้มีผลบังคับใช้นับแต่วันที่ลงนามทั้งสองฝ่าย</p>
+    </div>
+  </div>
+
+  <div class="rail">
+    <h3>Review Suggestions (2)</h3>
+
+    <div class="suggestion">
+
+    <div class="who">
+        <div class="avatar">ER</div>
+
+        <div>
+            <div class="name">
+                Employment Contract Reviewer
+            </div>
+
+            <div class="meta">
+                Legal Compliance • High Confidence
+            </div>
+        </div>
+    </div>
+
+    <div class="diff">
+
+        <del>6 เดือน</del>
+
+        →
+
+        <ins>1 ปี นับจากวันที่เริ่มปฏิบัติงาน</ins>
+
+    </div>
+
+    <div class="reason">
+        <strong>Reason</strong><br>
+        แนะนำให้ระบุระยะเวลาของสัญญาให้ชัดเจน
+        เพื่อให้สอดคล้องกับนโยบายบริษัท
+        และลดความกำกวมของเอกสาร
+    </div>
+
+    <div class="actions">
+        <button class="accept">✓ Apply</button>
+        <button class="reject">Dismiss</button>
+    </div>
+
+</div>
+
+    <div class="suggestion">
+
+    <div class="who">
+        <div class="avatar">ER</div>
+
+        <div>
+            <div class="name">
+                Employment Contract Reviewer
+            </div>
+
+            <div class="meta">
+                Legal Compliance • High Confidence
+            </div>
+        </div>
+    </div>
+
+    <div class="diff">
+
+        <del>ตามที่ตกลงกันด้วยวาจา</del>
+
+        →
+
+        <ins>ตามอัตราที่ระบุไว้ในเอกสารแนบท้ายสัญญา</ins>
+
+    </div>
+
+    <div class="reason">
+        <strong>Reason</strong><br>
+        การอ้างอิงเอกสารแนบช่วยให้ตรวจสอบได้
+        และลดความเสี่ยงจากข้อพิพาทในอนาคต
+    </div>
+
+    <div class="actions">
+        <button class="accept">✓ Apply</button>
+        <button class="reject">Dismiss</button>
+    </div>
+
+</div>
+
+    <div class="footer-note">
+
+Analysis performed by your organization's
+Employment Contract Reviewer.
+
+<br><br>
+
+The document remains under your organization's
+control throughout the review process.
+
+</div>
+</div>
+
+</body>
+</html>
