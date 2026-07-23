@@ -55,6 +55,22 @@
     border-radius: 4px;
     padding: 4px 10px;
   }
+  #analyzeBtn{
+    padding:8px 14px;
+    border:none;
+    border-radius:6px;
+    background:#1a73e8;
+    color:white;
+    font-size:12px;
+    font-weight:600;
+    cursor:pointer;
+    transition:.2s;
+}
+
+#analyzeBtn:hover{
+    background:#1557b0;
+}
+
   .toolbar .suggesting {
     margin-left: auto;
     background: var(--ins-bg);
@@ -168,9 +184,17 @@
   <span class="pill">Sarabun</span>
   <span class="pill">14</span>
 
-  <span class="suggesting">
-    ● กำลังวิเคราะห์เอกสาร • Powered by Private Skills
-  </span>
+  <button id="analyzeBtn">
+    🔍 Analyze Document
+  </button>
+
+  <span
+class="suggesting"
+id="statusText">
+
+● พร้อมวิเคราะห์ • Powered by Private Skills
+</span>
+
 </div>
 
 <div class="body">
@@ -180,8 +204,29 @@
         <p style="color:#5f6368;font-size:12px;">
         Draft Version • HR Department
         </p>
-      <p>บริษัทตกลงจ้าง <del>ลูกจ้างเป็นระยะเวลา 6 เดือน</del><ins>ลูกจ้างเป็นระยะเวลา 1 ปี นับจากวันที่เริ่มปฏิบัติงาน</ins> โดยมีระยะเวลาทดลองงาน 90 วันตามนโยบายบริษัท</p>
-      <p>ลูกจ้างจะได้รับค่าตอบแทน<del>ตามที่ตกลงกันด้วยวาจา</del><ins>ตามอัตราที่ระบุไว้ในเอกสารแนบท้ายสัญญาฉบับนี้</ins> และสวัสดิการตามที่บริษัทกำหนด</p>
+      <p>
+บริษัทตกลงจ้าง
+
+<span id="contract-duration">
+
+<del>ลูกจ้างเป็นระยะเวลา 6 เดือน</del>
+<ins>ลูกจ้างเป็นระยะเวลา 1 ปี นับจากวันที่เริ่มปฏิบัติงาน</ins>
+
+</span>
+
+โดยมีระยะเวลาทดลองงาน 90 วันตามนโยบายบริษัท
+</p>
+      <p>
+
+ลูกจ้างจะได้รับค่าตอบแทน
+
+<span id="salary-clause">
+
+<del>ตามที่ตกลงกันด้วยวาจา</del>
+
+<ins>ตามอัตราที่ระบุไว้ในเอกสารแนบท้ายสัญญาฉบับนี้</ins>
+
+</span> และสวัสดิการตามที่บริษัทกำหนด</p>
       <p>สัญญาฉบับนี้อยู่ภายใต้กฎหมายแรงงานไทย และให้มีผลบังคับใช้นับแต่วันที่ลงนามทั้งสองฝ่าย</p>
     </div>
   </div>
@@ -189,7 +234,8 @@
   <div class="rail">
     <h3>Review Suggestions (2)</h3>
 
-    <div class="suggestion">
+    <div class="suggestion"
+    data-target="contract-duration">
 
     <div class="who">
         <div class="avatar">ER</div>
@@ -223,13 +269,23 @@
     </div>
 
     <div class="actions">
-        <button class="accept">✓ Apply</button>
-        <button class="reject">Dismiss</button>
+        <button
+    class="accept"
+    data-action="apply">
+    ✓ Apply
+</button>
+        <button
+    class="reject"
+    data-action="dismiss">
+    Dismiss
+</button>
     </div>
 
 </div>
 
-    <div class="suggestion">
+    <div
+class="suggestion"
+data-target="salary-clause">
 
     <div class="who">
         <div class="avatar">ER</div>
@@ -262,8 +318,16 @@
     </div>
 
     <div class="actions">
-        <button class="accept">✓ Apply</button>
-        <button class="reject">Dismiss</button>
+        <button
+    class="accept"
+    data-action="apply">
+    ✓ Apply
+</button>
+        <button
+    class="reject"
+    data-action="dismiss">
+    Dismiss
+</button>
     </div>
 
 </div>
@@ -280,6 +344,76 @@ control throughout the review process.
 
 </div>
 </div>
+
+<script>
+    const analyzeBtn = document.getElementById("analyzeBtn");
+    const statusText = document.getElementById("statusText");
+
+    const suggestions = [
+    {
+        id: "contract-duration",
+        newText: "ลูกจ้างเป็นระยะเวลา 1 ปี นับจากวันที่เริ่มปฏิบัติงาน"
+    },
+    {
+        id: "salary-clause",
+        newText: "ตามอัตราที่ระบุไว้ในเอกสารแนบท้ายสัญญาฉบับนี้"
+    }
+];
+
+    analyzeBtn.addEventListener("click", () => {
+
+        statusText.innerHTML = "⏳ กำลังวิเคราะห์เอกสาร...";
+
+        setTimeout(() => {
+            statusText.innerHTML = "✅ วิเคราะห์เสร็จแล้ว • Powered by Private Skills";
+        }, 2000);
+
+    });
+
+    const applyButtons = document.querySelectorAll(".accept");
+    applyButtons.forEach(button => {
+    button.addEventListener("click", () => {
+
+    console.log("Apply clicked");
+
+    const card =
+    button.closest(".suggestion");
+
+    const targetId =
+    card.dataset.target;
+
+    console.log(targetId);
+
+    const target =
+    document.getElementById(targetId);
+
+    console.log(target);
+
+    const currentSuggestion =
+    suggestions.find(
+        s => s.id === targetId
+    );
+
+    console.log(currentSuggestion);
+
+    target.innerHTML =
+        currentSuggestion.newText;
+
+    card.remove();
+});
+});
+
+    const dismissButtons = document.querySelectorAll(".reject");
+    dismissButtons.forEach(button => {
+    button.addEventListener("click", () => {
+        const card = 
+        button.closest(".suggestion");
+
+    card.remove();
+    });
+
+});
+</script>
 
 </body>
 </html>
