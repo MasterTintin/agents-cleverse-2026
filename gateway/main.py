@@ -31,7 +31,7 @@ from pydantic import BaseModel
 load_dotenv()
  
 GATEWAY_PORT = int(os.getenv("GATEWAY_PORT", "8000"))
-SKILL_SERVICE_URL = os.getenv("SKILL_SERVICE_URL", "http://127.0.0.1:8001")
+SKILL_SERVICE_URL = os.getenv("SKILL_SERVICE_URL", "http://127.0.0.1:8002")
 REQUEST_TIMEOUT_SECONDS = 30
  
 # Public contract ที่ client ต้องเรียกจริง — ผ่าน Gateway เท่านั้น
@@ -84,17 +84,23 @@ app.add_middleware(
 )
  
  
+class DocumentInput(BaseModel):
+    title: str
+    content: str
+
+
 class ChatRequest(BaseModel):
-    skill: str = "document-edit"
-    input: dict
- 
- 
+    skill: str
+    input: DocumentInput
+
+
 class Instruction(BaseModel):
+    id: str
     old_str: str
     new_str: str
     reason: str
- 
- 
+
+
 class ChatResponse(BaseModel):
     instructions: list[Instruction]
  
@@ -154,7 +160,9 @@ def invoke_skill(skill_id: str, input_data: dict) -> list[dict]:
         # Secret prompt remains inside Protected Skill Service.
         response = httpx.post(
             f"{SKILL_SERVICE_URL}/execute",
-            json=input_data,
+            json={
+            "document": input_data.content
+            },
             timeout=REQUEST_TIMEOUT_SECONDS,
         )
         response.raise_for_status()

@@ -1,19 +1,20 @@
 {
-  "id": "document-edit",
-  "name": "Document Edit Skill",
+  "id": "employment-contract-reviewer",
+  "name": "Employment Contract Reviewer",
   "version": "v1",
   "status": "available",
   "provider": "Cleverse",
-  "capabilities": ["document-edit"],
+  "capabilities": ["document-review", "employment-contract-review"],
   "endpoint": "/execute",
   "method": "POST",
-  "description": "Analyze a document and return edit instructions.",
+  "description": "Review employment contracts and return editing suggestions.",
   "input": {
     "document": "string"
   },
   "output": {
     "instructions": [
       {
+        "id": "string",
         "old_str": "string",
         "new_str": "string",
         "reason": "string"

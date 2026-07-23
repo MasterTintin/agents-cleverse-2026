@@ -64,12 +64,12 @@ cp .env.example .env
 | ตัวแปร              | ค่า default             | ใช้ทำอะไร                                        |
 | ------------------- | ----------------------- | ------------------------------------------------ |
 | `GATEWAY_PORT`      | `8000`                  | port ที่ gateway รัน                             |
-| `SKILL_SERVICE_URL` | `http://127.0.0.1:8001` | URL ของ Protected Skill Service ที่จะ forward ไป |
+| `SKILL_SERVICE_URL` | `http://127.0.0.1:8002` | URL ของ Protected Skill Service ที่จะ forward ไป |
 
 ### 3. รัน server
 
 **ต้องรัน `protected_skill_service` ให้ขึ้นก่อน** (default ที่ port
-`8001`) แล้วค่อยรัน gateway:
+`8002`) แล้วค่อยรัน gateway:
 
 ```bash
 uvicorn main:app --reload --port 8000

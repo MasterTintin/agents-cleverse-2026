@@ -42,7 +42,7 @@ load_dotenv()
 with open(os.path.join(os.path.dirname(__file__), "manifest.json")) as f:
     SKILL_MANIFEST = json.load(f)
  
-SKILL_PORT = int(os.getenv("SKILL_PORT", "8001"))
+SKILL_PORT = int(os.getenv("SKILL_PORT", "8002"))
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api"
 MODEL_NAME = "anthropic/claude-sonnet-4"
