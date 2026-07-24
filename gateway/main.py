@@ -150,36 +150,53 @@ def get_implemented_skill_ids() -> set[str]:
 def invoke_skill(skill_id: str, input_data: dict) -> list[dict]:
     """
     เรียก Protected Skill Service แล้วคืนแค่ instructions
-
-    รับ input_data เป็น dict อิสระแล้ว forward ทั้งก้อนไปเป็น JSON body
-    ตรงๆ — Gateway ไม่ต้องรู้เลยว่า field ข้างในชื่ออะไรบ้าง (document?
-    resume? invoice?) ปล่อยให้ Protected Skill Service ตีความเอง
-    (Separation of Concerns) ไม่มีทางเห็น system prompt ที่ใช้ประมวลผล
-    อยู่เบื้องหลังเลย — Gateway เห็นแค่ old_str/new_str/reason ที่
-    Protected Skill ตัดสินใจส่งกลับมาแล้ว ไม่เห็นว่า Claude คิดยังไงถึง
-    ได้คำตอบนี้
-
-    หมายเหตุ: skill_id รับไว้เผื่ออนาคตต้อง route ไปหลาย service ตาม
-    skill ที่ขอ (ตอนนี้ยังไม่มี Skill Registry จริง เลย forward ไปที่
-    SKILL_SERVICE_URL เดียวเสมอ ไม่ว่า skill_id จะเป็นอะไร)
     """
     try:
-        # Gateway forwards only user input.
-        # Secret prompt remains inside Protected Skill Service.
+        print("=" * 60)
+        print(f"[Gateway] Invoking skill: {skill_id}")
+        print(f"[Gateway] URL: {SKILL_SERVICE_URL}/execute")
+        print(f"[Gateway] Payload: {input_data}")
+
         response = httpx.post(
             f"{SKILL_SERVICE_URL}/execute",
             json=input_data,
             timeout=REQUEST_TIMEOUT_SECONDS,
         )
+
+        print(f"[Gateway] Status Code: {response.status_code}")
+        print(f"[Gateway] Response Body: {response.text}")
+
         response.raise_for_status()
+
+        data = response.json()
+
+        print(f"[Gateway] Parsed JSON: {data}")
+
+        if "instructions" not in data:
+            raise RuntimeError(
+                f"Protected Skill Service ไม่ได้ส่ง instructions กลับมา: {data}"
+            )
+
+        print("[Gateway] Success")
+        print("=" * 60)
+
+        return data["instructions"]
+
     except httpx.HTTPStatusError as exc:
+        print(f"[Gateway] HTTPStatusError: {exc}")
         raise RuntimeError(
             f"Protected Skill Service ตอบกลับผิดพลาด: {exc.response.status_code}"
         ) from exc
-    except httpx.RequestError as exc:
-        raise RuntimeError(f"เชื่อมต่อ Protected Skill Service ไม่ได้: {exc}") from exc
 
-    return response.json()["instructions"]
+    except httpx.RequestError as exc:
+        print(f"[Gateway] RequestError: {exc}")
+        raise RuntimeError(
+            f"เชื่อมต่อ Protected Skill Service ไม่ได้: {exc}"
+        ) from exc
+
+    except Exception as exc:
+        print(f"[Gateway] Unexpected Error: {exc}")
+        raise
 
 
 def to_public_manifest(skill: dict) -> dict:
