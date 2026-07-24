@@ -1,419 +1,389 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="th">
-<head>
-<meta charset="UTF-8" />
-<title>Embedded Enterprise Skills — Document Review Panel</title>
-<style>
-  :root {
-    --toolbar: #f1f3f4;
-    --border: #dadce0;
-    --text: #202124;
-    --muted: #5f6368;
-    --blue: #1a73e8;
-    --ins: #188038;
-    --ins-bg: #e6f4ea;
-    --del: #d93025;
-    --del-bg: #fce8e6;
-  }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0;
-    font-family: "Segoe UI", -apple-system, "Sarabun", sans-serif;
-    background: #e8eaed;
-    color: var(--text);
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-  }
+  <head>
+    <meta charset="UTF-8" />
+    <title>Embedded Enterprise Skills — Document Review Panel</title>
+    <style>
+      :root {
+        --toolbar: #f1f3f4;
+        --border: #dadce0;
+        --text: #202124;
+        --muted: #5f6368;
+        --blue: #1a73e8;
+        --ins: #188038;
+        --ins-bg: #e6f4ea;
+        --del: #d93025;
+        --del-bg: #fce8e6;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family:
+          "Segoe UI",
+          -apple-system,
+          "Sarabun",
+          sans-serif;
+        background: #e8eaed;
+        color: var(--text);
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
 
-  /* --- Fake app chrome --- */
-  .menubar {
-    background: white;
-    border-bottom: 1px solid var(--border);
-    padding: 8px 16px 0;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-  .menubar .doc-icon { width: 28px; height: 28px; background: var(--blue); border-radius: 4px; }
-  .menubar .titles { display: flex; flex-direction: column; }
-  .menubar .doc-title { font-size: 14px; }
-  .menubar .menu-items { display: flex; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 2px; }
-  .toolbar {
-    background: var(--toolbar);
-    border-bottom: 1px solid var(--border);
-    padding: 6px 16px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 12px;
-    color: var(--muted);
-  }
-  .toolbar .pill {
-    background: white;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 4px 10px;
-  }
-  #analyzeBtn{
-    padding:8px 14px;
-    border:none;
-    border-radius:6px;
-    background:#1a73e8;
-    color:white;
-    font-size:12px;
-    font-weight:600;
-    cursor:pointer;
-    transition:.2s;
-}
+      /* --- Fake app chrome --- */
+      .menubar {
+        background: white;
+        border-bottom: 1px solid var(--border);
+        padding: 8px 16px 0;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+      .menubar .doc-icon {
+        width: 28px;
+        height: 28px;
+        background: var(--blue);
+        border-radius: 4px;
+      }
+      .menubar .titles {
+        display: flex;
+        flex-direction: column;
+      }
+      .menubar .doc-title {
+        font-size: 14px;
+      }
+      .menubar .menu-items {
+        display: flex;
+        gap: 14px;
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+      .toolbar {
+        background: var(--toolbar);
+        border-bottom: 1px solid var(--border);
+        padding: 6px 16px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .toolbar .pill {
+        background: white;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 4px 10px;
+      }
+      .toolbar .status-group {
+        margin-left: auto;
+        text-align: right;
+        line-height: 1.4;
+      }
+      .toolbar .status-line {
+        background: var(--ins-bg);
+        color: var(--ins);
+        border-radius: 4px;
+        padding: 4px 10px;
+        font-weight: 600;
+      }
+      .toolbar .status-line.idle {
+        background: #f1f3f4;
+        color: var(--muted);
+      }
+      .toolbar .powered-by {
+        font-size: 10px;
+        color: var(--muted);
+        margin-top: 2px;
+      }
 
-#analyzeBtn:hover{
-    background:#1557b0;
-}
+      /* --- Body: document + suggestions rail --- */
+      .body {
+        flex: 1;
+        display: flex;
+        overflow: hidden;
+        background: #e8eaed;
+      }
+      .doc-scroll {
+        flex: 1;
+        overflow-y: auto;
+        padding: 40px 0;
+      }
+      .page {
+        background: white;
+        width: 700px;
+        min-height: 850px;
+        margin: 0 auto;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+        padding: 60px 70px;
+        font-size: 14px;
+        line-height: 2;
+      }
+      .page h2 {
+        font-size: 18px;
+        margin-top: 0;
+      }
+      .page del {
+        color: var(--del);
+        background: var(--del-bg);
+        text-decoration: line-through;
+      }
+      .page ins {
+        color: var(--ins);
+        background: var(--ins-bg);
+        text-decoration: underline;
+      }
 
-  .toolbar .suggesting {
-    margin-left: auto;
-    background: var(--ins-bg);
-    color: var(--ins);
-    border-radius: 4px;
-    padding: 4px 10px;
-    font-weight: 600;
-  }
+      .rail {
+        width: 310px;
+        background: white;
+        border-left: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+      }
+      .rail-header {
+        padding: 14px 14px 10px;
+        border-bottom: 1px solid var(--border);
+      }
+      .rail-header h3 {
+        font-size: 12px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin: 0 0 10px;
+      }
+      #analyze-btn {
+        width: 100%;
+        background: var(--blue);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        padding: 9px 0;
+        font-size: 13px;
+        font-weight: 600;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+      }
+      #analyze-btn:disabled {
+        background: #9aa0a6;
+        cursor: not-allowed;
+      }
 
-  /* --- Body: document + suggestions rail --- */
-  .body {
-    flex: 1;
-    display: flex;
-    overflow: hidden;
-    background: #e8eaed;
-  }
-  .doc-scroll { flex: 1; overflow-y: auto; padding: 40px 0; }
-  .page {
-    background: white;
-    width: 700px;
-    min-height: 850px;
-    margin: 0 auto;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
-    padding: 60px 70px;
-    font-size: 14px;
-    line-height: 2;
-  }
-  .page h2 { font-size: 18px; margin-top: 0; }
-  .page del { color: var(--del); background: var(--del-bg); text-decoration: line-through; }
-  .page ins { color: var(--ins); background: var(--ins-bg); text-decoration: none; }
+      .rail-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 12px 14px;
+      }
 
-  .rail {
-    width: 300px;
-    background: white;
-    border-left: 1px solid var(--border);
-    overflow-y: auto;
-    padding: 16px 14px;
-  }
-  .rail h3 { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 4px 0 12px; }
-  .suggestion {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px;
-    margin-bottom: 12px;
-    font-size: 12.5px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
-  }
-  .suggestion .who {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
-  }
-  .avatar {
-    width: 22px; height: 22px; border-radius: 50%;
-    background: var(--blue); color: white;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 10px; font-weight: 700;
-  }
-  .suggestion .name { font-weight: 600; }
-  .meta{
-    font-size:11px;
-    color:#5f6368;
-    margin-top:2px;
-}
+      .empty-state {
+        text-align: center;
+        color: var(--muted);
+        font-size: 12.5px;
+        padding: 30px 10px;
+        line-height: 1.6;
+      }
+      .loading-state {
+        text-align: center;
+        color: var(--muted);
+        font-size: 12.5px;
+        padding: 30px 10px;
+      }
 
-.reason{
-    margin-top:10px;
-    padding-top:8px;
-    border-top:1px solid #eee;
-    font-size:11px;
-    color:#5f6368;
-    line-height:1.6;
-}
-  .suggestion .diff { line-height: 1.6; margin-bottom: 8px; }
-  .suggestion .diff del { color: var(--del); background: var(--del-bg); text-decoration: line-through; }
-  .suggestion .diff ins { color: var(--ins); background: var(--ins-bg); text-decoration: none; }
-  .suggestion .actions { display: flex; gap: 6px; }
-  .suggestion .actions button {
-    flex: 1;
-    border: 1px solid var(--border);
-    background: white;
-    border-radius: 6px;
-    padding: 5px 0;
-    font-size: 11px;
-    cursor: pointer;
-  }
-  .suggestion .actions .accept { color: var(--ins); border-color: var(--ins); }
-  .suggestion .actions .reject { color: var(--del); border-color: var(--del); }
-  .footer-note {
-    font-size: 11px;
-    color: var(--muted);
-    padding: 10px 4px 4px;
-    border-top: 1px solid var(--border);
-    margin-top: 4px;
-  }
-</style>
-</head>
-<body>
+      .suggestion {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 12px;
+        margin-bottom: 12px;
+        font-size: 12.5px;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+      }
+      .suggestion .who {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+      .avatar {
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        background: var(--blue);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+      }
+      .suggestion .name {
+        font-weight: 600;
+      }
+      .tags-row {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 8px;
+      }
+      .category-tag {
+        display: inline-block;
+        background: #eef2ff;
+        color: #4f46e5;
+        font-size: 10px;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 999px;
+      }
+      .priority-tag {
+        display: inline-block;
+        font-size: 10px;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        padding: 2px 8px;
+        border-radius: 999px;
+      }
+      .priority-tag.priority-high {
+        background: var(--del-bg);
+        color: var(--del);
+      }
+      .priority-tag.priority-medium {
+        background: #fef3c7;
+        color: #b45309;
+      }
+      .priority-tag.priority-low {
+        background: #f1f3f4;
+        color: var(--muted);
+      }
+      .suggestion .diff {
+        line-height: 1.6;
+        margin-bottom: 8px;
+      }
+      .suggestion .diff del {
+        color: var(--del);
+        background: var(--del-bg);
+        text-decoration: line-through;
+      }
+      .suggestion .diff ins {
+        color: var(--ins);
+        background: var(--ins-bg);
+        text-decoration: underline;
+      }
+      .suggestion .reason {
+        color: var(--muted);
+        font-size: 11.5px;
+        line-height: 1.5;
+        margin-bottom: 10px;
+        padding-top: 8px;
+        border-top: 1px dashed var(--border);
+      }
+      .suggestion .reason .label {
+        display: block;
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 9.5px;
+        letter-spacing: 0.04em;
+        color: #9aa0a6;
+        margin-bottom: 2px;
+      }
+      .suggestion .actions {
+        display: flex;
+        gap: 6px;
+      }
+      .suggestion .actions button {
+        flex: 1;
+        border: 1px solid var(--border);
+        background: white;
+        border-radius: 6px;
+        padding: 6px 0;
+        font-size: 11.5px;
+        cursor: pointer;
+      }
+      .suggestion .actions .accept {
+        color: var(--ins);
+        border-color: var(--ins);
+      }
+      .suggestion .actions .dismiss {
+        color: var(--muted);
+      }
 
-<div class="menubar">
-  <div class="doc-icon"></div>
-  <div class="titles">
-    <div class="doc-title">สัญญาจ้างงาน — ฉบับร่าง</div>
-    <div class="menu-items"><span>ไฟล์</span><span>แก้ไข</span><span>ดู</span><span>แทรก</span><span>รูปแบบ</span></div>
-  </div>
-</div>
+      .footer-note {
+        font-size: 10.5px;
+        color: var(--muted);
+        line-height: 1.5;
+        padding: 10px 14px;
+        border-top: 1px solid var(--border);
+      }
 
-<div class="toolbar">
-  <span class="pill">100%</span>
-  <span class="pill">Sarabun</span>
-  <span class="pill">14</span>
-
-  <button id="analyzeBtn">
-    🔍 Analyze Document
-  </button>
-
-  <span
-class="suggesting"
-id="statusText">
-
-● พร้อมวิเคราะห์ • Powered by Private Skills
-</span>
-
-</div>
-
-<div class="body">
-  <div class="doc-scroll">
-    <div class="page">
-      <h2>Employment Agreement</h2>
-        <p style="color:#5f6368;font-size:12px;">
-        Draft Version • HR Department
-        </p>
-      <p>
-บริษัทตกลงจ้าง
-
-<span id="contract-duration">
-
-<del>ลูกจ้างเป็นระยะเวลา 6 เดือน</del>
-<ins>ลูกจ้างเป็นระยะเวลา 1 ปี นับจากวันที่เริ่มปฏิบัติงาน</ins>
-
-</span>
-
-โดยมีระยะเวลาทดลองงาน 90 วันตามนโยบายบริษัท
-</p>
-      <p>
-
-ลูกจ้างจะได้รับค่าตอบแทน
-
-<span id="salary-clause">
-
-<del>ตามที่ตกลงกันด้วยวาจา</del>
-
-<ins>ตามอัตราที่ระบุไว้ในเอกสารแนบท้ายสัญญาฉบับนี้</ins>
-
-</span> และสวัสดิการตามที่บริษัทกำหนด</p>
-      <p>สัญญาฉบับนี้อยู่ภายใต้กฎหมายแรงงานไทย และให้มีผลบังคับใช้นับแต่วันที่ลงนามทั้งสองฝ่าย</p>
-    </div>
-  </div>
-
-  <div class="rail">
-    <h3>Review Suggestions (2)</h3>
-
-    <div class="suggestion"
-    data-target="contract-duration">
-
-    <div class="who">
-        <div class="avatar">ER</div>
-
-        <div>
-            <div class="name">
-                Employment Contract Reviewer
-            </div>
-
-            <div class="meta">
-                Legal Compliance • High Confidence
-            </div>
+      /* diff span ที่ยังไม่ apply/dismiss ในตัวเอกสาร */
+      .pending-diff {
+        background-color: #fff8dc;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="menubar">
+      <div class="doc-icon"></div>
+      <div class="titles">
+        <div class="doc-title">สัญญาจ้างงาน — ฉบับร่าง</div>
+        <div class="menu-items">
+          <span>ไฟล์</span><span>แก้ไข</span><span>ดู</span><span>แทรก</span
+          ><span>รูปแบบ</span>
         </div>
+      </div>
     </div>
 
-    <div class="diff">
-
-        <del>6 เดือน</del>
-
-        →
-
-        <ins>1 ปี นับจากวันที่เริ่มปฏิบัติงาน</ins>
-
-    </div>
-
-    <div class="reason">
-        <strong>Reason</strong><br>
-        แนะนำให้ระบุระยะเวลาของสัญญาให้ชัดเจน
-        เพื่อให้สอดคล้องกับนโยบายบริษัท
-        และลดความกำกวมของเอกสาร
-    </div>
-
-    <div class="actions">
-        <button
-    class="accept"
-    data-action="apply">
-    ✓ Apply
-</button>
-        <button
-    class="reject"
-    data-action="dismiss">
-    Dismiss
-</button>
-    </div>
-
-</div>
-
-    <div
-class="suggestion"
-data-target="salary-clause">
-
-    <div class="who">
-        <div class="avatar">ER</div>
-
-        <div>
-            <div class="name">
-                Employment Contract Reviewer
-            </div>
-
-            <div class="meta">
-                Legal Compliance • High Confidence
-            </div>
+    <div class="toolbar">
+      <span class="pill">100%</span>
+      <span class="pill">Sarabun</span>
+      <span class="pill">14</span>
+      <div class="status-group">
+        <div class="status-line idle" id="status-line">
+          พร้อมวิเคราะห์เอกสาร
         </div>
+        <div class="powered-by">Powered by Private Skills</div>
+      </div>
     </div>
 
-    <div class="diff">
+    <div class="body">
+      <div class="doc-scroll">
+        <div class="page" id="doc-page">
+          <h2>สัญญาจ้างงาน</h2>
+          <p data-para="0">
+            บริษัทตกลงจ้างลูกจ้างเป็นระยะเวลา 6 เดือน โดยมีระยะเวลาทดลองงาน 90
+            วันตามนโยบายบริษัท
+          </p>
+          <p data-para="1">
+            ลูกจ้างจะได้รับค่าตอบแทนตามที่ตกลงกันด้วยวาจา
+            และสวัสดิการตามที่บริษัทกำหนด
+          </p>
+          <p data-para="2">
+            สัญญาฉบับนี้อยู่ภายใต้กฎหมายแรงงานไทย
+            และให้มีผลบังคับใช้นับแต่วันที่ลงนามทั้งสองฝ่าย
+          </p>
+        </div>
+      </div>
 
-        <del>ตามที่ตกลงกันด้วยวาจา</del>
-
-        →
-
-        <ins>ตามอัตราที่ระบุไว้ในเอกสารแนบท้ายสัญญา</ins>
-
+      <div class="rail">
+        <div class="rail-header">
+          <h3>คำแนะนำในการแก้ไข</h3>
+          <button id="analyze-btn">🔍 Analyze Document</button>
+        </div>
+        <div class="rail-list" id="rail-list">
+          <div class="empty-state" id="empty-state">
+            กดปุ่มด้านบนเพื่อเริ่มวิเคราะห์เอกสาร
+          </div>
+        </div>
+        <div class="footer-note">
+          การวิเคราะห์ดำเนินการโดย Private Skill ขององค์กร<br />
+          เอกสารยังคงอยู่ภายใต้การควบคุมขององค์กรของคุณ
+        </div>
+      </div>
     </div>
 
-    <div class="reason">
-        <strong>Reason</strong><br>
-        การอ้างอิงเอกสารแนบช่วยให้ตรวจสอบได้
-        และลดความเสี่ยงจากข้อพิพาทในอนาคต
-    </div>
-
-    <div class="actions">
-        <button
-    class="accept"
-    data-action="apply">
-    ✓ Apply
-</button>
-        <button
-    class="reject"
-    data-action="dismiss">
-    Dismiss
-</button>
-    </div>
-
-</div>
-
-    <div class="footer-note">
-
-Analysis performed by your organization's
-Employment Contract Reviewer.
-
-<br><br>
-
-The document remains under your organization's
-control throughout the review process.
-
-</div>
-</div>
-
-<script>
-    const analyzeBtn = document.getElementById("analyzeBtn");
-    const statusText = document.getElementById("statusText");
-
-    const suggestions = [
-    {
-        id: "contract-duration",
-        newText: "ลูกจ้างเป็นระยะเวลา 1 ปี นับจากวันที่เริ่มปฏิบัติงาน"
-    },
-    {
-        id: "salary-clause",
-        newText: "ตามอัตราที่ระบุไว้ในเอกสารแนบท้ายสัญญาฉบับนี้"
-    }
-];
-
-    analyzeBtn.addEventListener("click", () => {
-
-        statusText.innerHTML = "⏳ กำลังวิเคราะห์เอกสาร...";
-
-        setTimeout(() => {
-            statusText.innerHTML = "✅ วิเคราะห์เสร็จแล้ว • Powered by Private Skills";
-        }, 2000);
-
-    });
-
-    const applyButtons = document.querySelectorAll(".accept");
-    applyButtons.forEach(button => {
-    button.addEventListener("click", () => {
-
-    console.log("Apply clicked");
-
-    const card =
-    button.closest(".suggestion");
-
-    const targetId =
-    card.dataset.target;
-
-    console.log(targetId);
-
-    const target =
-    document.getElementById(targetId);
-
-    console.log(target);
-
-    const currentSuggestion =
-    suggestions.find(
-        s => s.id === targetId
-    );
-
-    console.log(currentSuggestion);
-
-    target.innerHTML =
-        currentSuggestion.newText;
-
-    card.remove();
-});
-});
-
-    const dismissButtons = document.querySelectorAll(".reject");
-    dismissButtons.forEach(button => {
-    button.addEventListener("click", () => {
-        const card = 
-        button.closest(".suggestion");
-
-    card.remove();
-    });
-
-});
-</script>
-
-</body>
+    <script src="document.js"></script>
+    <script src="suggestions.js"></script>
+    <script src="script.js"></script>
+  </body>
 </html>

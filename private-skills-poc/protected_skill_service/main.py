@@ -8,6 +8,12 @@ Protected Skill Service
 Skill นี้คือ "Internal Document Edit Skill" — รับ "เอกสาร" แล้ววิเคราะห์
 ตามเกณฑ์ภายในองค์กร แล้วคืนเป็นคำสั่งแก้ไข (ไม่ใช่ข้อความประเมินอิสระ)
 
+Phase 1 (ดู docs/research/file-edit-approach.md): แทนที่จะคืนข้อความ
+รีวิวอิสระ ตอนนี้ Skill คืน "edit instructions" แบบ structured
+({old_str, new_str}) โดยใช้ Claude tool_use (function calling) บังคับ
+schema ให้แน่นอน แทนการขอให้ Claude พิมพ์ JSON เป็นข้อความธรรมดา
+(ซึ่งเสี่ยง parse fail ถ้า Claude แถมคำอธิบายปนมา)
+
 เรียก Claude ผ่าน OpenRouter's Anthropic-compatible endpoint (ไม่ใช่
 Anthropic API ตรงๆ) — ใช้ Anthropic SDK เดิม แค่เปลี่ยน base_url/auth:
   - base_url ต้องเป็น "https://openrouter.ai/api" (ไม่มี /v1 ต่อท้าย
@@ -21,35 +27,35 @@ Input:  {"document": "..."}
 Output: {"instructions": [{"old_str": "...", "new_str": "...", "reason": "..."}, ...]}
 """
 
-
 import json
 import os
 import traceback
- 
+from typing import Literal
+
 from anthropic import Anthropic
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
- 
+
 from prompt import SECRET_SYSTEM_PROMPT
- 
+
 load_dotenv()
- 
+
 # manifest.json คือ "public description" ของ Skill นี้ — สิ่งที่ Client
 # ต้องรู้เพื่อจะเรียกใช้ (name, description, input/output shape) แยก
-# ไฟล์จาก prompt.py (secret) โดยเจตนา ตาม Public vs Private breakdown
-# ใน docs/research/agents-research.md
+# ไฟล์จาก prompt.py
 with open(os.path.join(os.path.dirname(__file__), "manifest.json")) as f:
     SKILL_MANIFEST = json.load(f)
- 
-SKILL_PORT = int(os.getenv("SKILL_PORT", "8002"))
+
+SKILL_PORT = int(os.getenv("SKILL_PORT", "8001"))
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api"
 MODEL_NAME = "anthropic/claude-sonnet-4"
 MAX_TOKENS = 1500
- 
+
 # ชื่อ tool ที่บังคับให้ Claude ต้องเรียกเพื่อตอบกลับ — การบังคับผ่าน
-# tool_choice ทำให้ response เป็น JSON ตาม schema นี้เสมอ 
+# tool_choice ทำให้ response เป็น JSON ตาม schema นี้เสมอ ไม่มีทาง
+# หลุดเป็น free-text แบบขอผ่าน prompt เฉยๆ
 SUBMIT_INSTRUCTIONS_TOOL = {
     "name": "submit_edit_instructions",
     "description": (
@@ -76,15 +82,24 @@ SUBMIT_INSTRUCTIONS_TOOL = {
                             "type": "string",
                             "description": "คำอธิบายสั้นๆ ว่าทำไมถึงแก้ตรงนี้ (โชว์ให้ user เห็น)",
                         },
+                        "priority": {
+                            "type": "string",
+                            "enum": ["high", "medium", "low"],
+                            "description": (
+                                "high = legal risk/compliance, "
+                                "medium = policy consistency, "
+                                "low = clarity/wording"
+                            ),
+                        },
                     },
-                    "required": ["old_str", "new_str", "reason"],
+                    "required": ["old_str", "new_str", "reason", "priority"],
                 },
             },
         },
         "required": ["instructions"],
     },
 }
- 
+
 app = FastAPI(title="Protected Skill Service - Instruction-based Editing")
 client = (
     Anthropic(
@@ -94,26 +109,31 @@ client = (
     if OPENROUTER_API_KEY
     else None
 )
- 
- 
+
+
 class ExecuteRequest(BaseModel):
     document: str
- 
- 
+
+
 class Instruction(BaseModel):
     old_str: str
     new_str: str
     reason: str
- 
- 
+    priority: Literal["high", "medium", "low"]
+
+
 class ExecuteResponse(BaseModel):
     instructions: list[Instruction]
- 
- 
-def extract_instructions(message) -> list[dict]:
+
+
+from anthropic.types import Message
+
+def extract_instructions(
+    message: Message,
+) -> list[dict]:
     """
     ดึง instructions ออกจาก tool_use block ของ Claude response
- 
+
     แยกออกมาเป็นฟังก์ชันเดี่ยวๆ ไม่ผูกกับ client.messages.create() เลย
     เพื่อให้ unit test ได้ตรงๆ โดยจำลอง message.content เป็น object ปลอม
     โดยไม่ต้องเรียก API จริง
@@ -121,9 +141,11 @@ def extract_instructions(message) -> list[dict]:
     for block in message.content:
         if block.type == "tool_use" and block.name == "submit_edit_instructions":
             return block.input.get("instructions", [])
-    raise RuntimeError("Claude ไม่ได้เรียก submit_edit_instructions tool กลับมา")
- 
- 
+    raise RuntimeError(
+    "Expected tool 'submit_edit_instructions' but Claude returned no tool_use block."
+)
+
+
 def run_skill(document: str) -> list[dict]:
     """
     Business logic ล้วนๆ: รับเอกสาร -> เรียก Claude (ผ่าน OpenRouter) ด้วย
@@ -133,7 +155,7 @@ def run_skill(document: str) -> list[dict]:
     """
     if client is None:
         raise RuntimeError("OPENROUTER_API_KEY ยังไม่ได้ตั้งค่า (ดู .env.example)")
- 
+
     try:
         message = client.messages.create(
             model=MODEL_NAME,
@@ -145,27 +167,30 @@ def run_skill(document: str) -> list[dict]:
         )
     except Exception as exc:  # เช่น API ล่ม, rate limit, network error
         # DEBUG: พิมพ์ full traceback ออกที่ terminal ฝั่ง server เท่านั้น
-        # เพื่อดู exception type จริง
+        # เพื่อดู exception type จริง (AuthenticationError, RateLimitError,
+        # NotFoundError)
         traceback.print_exc()
         raise RuntimeError(f"เรียก Claude ไม่สำเร็จ: {exc}") from exc
- 
+
     return extract_instructions(message)
- 
- 
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
- 
- 
+
+
 @app.get("/skills")
 def skills():
     """
     Capability discovery — บอก client ว่า Skill นี้ทำอะไรได้ โดยไม่ต้อง
-    เปิดเผย prompt หรือ implementation เลย คืนเป็น list
+    เปิดเผย prompt หรือ implementation เลยแม้แต่นิดเดียว คืนเป็น list
+    เผื่ออนาคตขยายเป็นหลาย Skill ต่อ service (ตอนนี้ hardcode มีแค่ตัว
+    เดียวจาก manifest.json — ยังไม่มี Skill Registry จริง)
     """
     return [SKILL_MANIFEST]
- 
- 
+
+
 @app.post("/execute", response_model=ExecuteResponse)
 def execute(payload: ExecuteRequest):
     """
@@ -173,16 +198,16 @@ def execute(payload: ExecuteRequest):
     """
     if not payload.document.strip():
         raise HTTPException(status_code=400, detail="document ต้องไม่ว่างเปล่า")
- 
+
     try:
         instructions = run_skill(payload.document)
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
- 
+
     return ExecuteResponse(instructions=instructions)
- 
- 
+
+
 if __name__ == "__main__":
     import uvicorn
- 
+
     uvicorn.run(app, host="0.0.0.0", port=SKILL_PORT)
